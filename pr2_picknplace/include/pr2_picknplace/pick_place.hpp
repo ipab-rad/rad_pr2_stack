@@ -20,38 +20,50 @@
 #include <geometry_msgs/Pose.h>
 #include <pr2_picknplace_msgs/PickPlaceAction.h>
 
+// MoveIt
+#include <moveit/move_group_interface/move_group.h>
+#include <moveit/planning_scene_interface/planning_scene_interface.h>
+#include <moveit_msgs/DisplayRobotState.h>
+#include <moveit_msgs/DisplayTrajectory.h>
+#include <moveit_msgs/AttachedCollisionObject.h>
+#include <moveit_msgs/CollisionObject.h>
+
 class PickPlaceAction {
- protected:
-  ros::NodeHandle nh_;
-  // NodeHandle instance must be created before this line.
-  // Otherwise strange error may occur.
-  actionlib::SimpleActionServer<pr2_picknplace_msgs::PickPlaceAction> as_;
-  std::string action_name_;
-  pr2_picknplace_msgs::PickPlaceFeedback feedback_;
-  pr2_picknplace_msgs::PickPlaceResult result_;
+  protected:
+    ros::NodeHandle nh_;
+    // NodeHandle instance must be created before this line.
+    // Otherwise strange error may occur.
+    actionlib::SimpleActionServer<pr2_picknplace_msgs::PickPlaceAction> as_;
+    std::string action_name_;
+    pr2_picknplace_msgs::PickPlaceFeedback feedback_;
+    pr2_picknplace_msgs::PickPlaceResult result_;
 
- public:
-  PickPlaceAction(ros::NodeHandle nh, std::string name);
+  public:
+    PickPlaceAction(ros::NodeHandle& nh, std::string name);
 
-  ~PickPlaceAction(void);
+    ~PickPlaceAction(void);
 
-  void loadParams();
-  void init();
-  void rosSetup();
+    void loadParams();
+    void init();
+    void rosSetup();
 
-  void goalCB();
+    void goalCB();
 
-  void preemptCB();
+    void preemptCB();
 
-  void executeCB();
+    void executeCB();
 
- private:
-  // Flags
-  bool going;
+  private:
+    // Flags
+    bool going;
 
-  // Variables
-  uint8_t request_;
-  geometry_msgs::Pose object_pose_;
+    // Variables
+    uint8_t request_;
+    geometry_msgs::Pose object_pose_;
+    moveit::planning_interface::MoveGroup move_group_right_arm;
+    moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
+    // ros::Publisher display_publisher;
+    // moveit_msgs::DisplayTrajectory display_trajectory;
 };
 
 #endif  /* PICK_PLACE_HPP */

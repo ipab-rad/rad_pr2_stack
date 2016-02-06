@@ -11,6 +11,9 @@ find_package(catkin REQUIRED COMPONENTS
   move_base_msgs
   moveit_msgs
   std_msgs
+  moveit_core
+  moveit_ros_planning
+  moveit_ros_planning_interface
 )
 
 ## System dependencies are found with CMake's conventions
@@ -107,6 +110,8 @@ catkin_package(
 #  LIBRARIES pr2_picknplace
  CATKIN_DEPENDS pr2_picknplace_msgs actionlib move_base_msgs moveit_msgs std_msgs
 #  DEPENDS system_lib
+  moveit_core
+  moveit_ros_planning_interface
 )
 
 ###########
@@ -119,6 +124,8 @@ catkin_package(
 # message (STATUS "CLang not found")
 # endif()
 
+find_package(Eigen3 REQUIRED)
+
 # set(CMAKE_CXX_COMPILER "/usr/bin/clang++-3.6")
 # set(CMAKE_C_COMPILER "/usr/bin/clang-3.6")
 set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -O2")
@@ -129,6 +136,7 @@ set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -O2")
 include_directories(
   include
   ${catkin_INCLUDE_DIRS}
+  ${EIGEN3_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
