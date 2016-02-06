@@ -22,6 +22,9 @@ PickPlaceAction::PickPlaceAction(ros::NodeHandle& nh, std::string name) :
   this->init();
   this->rosSetup();
 
+  ros::Duration(1.0).sleep();
+
+  this->AddCollisionObjs();
   ROS_INFO("[PICKPLACEACTION] Starting PickPlace action server.");
   as_.start();
 }
@@ -118,4 +121,37 @@ void PickPlaceAction::executeCB() {
     as_.setSucceeded(result_);
   }
 
+}
+
+
+void PickPlaceAction::AddCollisionObjs() {
+  moveit_msgs::CollisionObject collision_object;
+  collision_object.header.frame_id = move_group_right_arm.getPlanningFrame();
+
+  /* The id of the object is used to identify it. */
+  collision_object.id = "table_top";
+
+  /* Define a box to add to the world. */
+  shape_msgs::SolidPrimitive primitive;
+  primitive.type = primitive.CYLINDER;
+  primitive.dimensions.resize(2);
+  primitive.dimensions[0] = 0.0254;  // Height of cylinder
+  primitive.dimensions[1] = 0.6;    // Radius
+
+  /* A pose for the box (specified relative to frame_id) */
+  geometry_msgs::Pose table_top_pose;
+  table_top_pose.orientation.w = 1.0;
+  table_top_pose.position.x =  1.0;
+  table_top_pose.position.y =  0.0;
+  table_top_pose.position.z =  0.7;
+
+  collision_object.primitives.push_back(primitive);
+  collision_object.primitive_poses.push_back(table_top_pose);
+  collision_object.operation = collision_object.ADD;
+
+  std::vector<moveit_msgs::CollisionObject> collision_objects;
+  collision_objects.push_back(collision_object);
+
+  ROS_INFO("Add an object into the world ...");
+  planning_scene_interface.addCollisionObjects(collision_objects);
 }

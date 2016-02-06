@@ -65,6 +65,9 @@ class PickPlaceAction {
     moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
     // ros::Publisher display_publisher;
     // moveit_msgs::DisplayTrajectory display_trajectory;
+
+    // Methods
+    void AddCollisionObjs();
 };
 
 #endif  /* PICK_PLACE_HPP */
