@@ -43,32 +43,32 @@ void PickPlaceAction::rosSetup() {
 }
 
 void PickPlaceAction::goalCB() {
-  request_ = as_.acceptNewGoal()->request;
-  object_pose_ = as_.acceptNewGoal()->object_pose;
-  ROS_INFO_STREAM("Received a goal for" << request_  << " - " << object_pose_);
+  pick_place_goal_ = as_.acceptNewGoal()->goal;
+  ROS_INFO_STREAM("Received a goal for" << pick_place_goal_.request  <<
+                  " - " << pick_place_goal_.object_pose);
   this->executeCB();
 }
 
 void PickPlaceAction::preemptCB() {
   // Received preempt request to stop
-  going = false;
+  // going = false;
   as_.setPreempted();
 }
 
 void PickPlaceAction::executeCB() {
   ROS_INFO("Executing goal for %s", action_name_.c_str());
-  bool going = true;
+  // bool going = true;
   bool success = true;
 
   if (as_.isPreemptRequested() || !ros::ok()) {
     ROS_INFO("%s: Preempted", action_name_.c_str());
     as_.setPreempted();
     success = false;
-    going = false;
+    // going = false;
   }
 
   // Call the MoveIt magic
-  move_group_right_arm.setPoseTarget(object_pose_);
+  move_group_right_arm.setPoseTarget(pick_place_goal_.object_pose);
   moveit::planning_interface::MoveGroup::Plan obj_pose_plan;
   success = move_group_right_arm.plan(obj_pose_plan);
   // display_trajectory.trajectory_start = obj_pose_plan.start_state_;
@@ -78,7 +78,8 @@ void PickPlaceAction::executeCB() {
     success = move_group_right_arm.execute(obj_pose_plan);
     ROS_DEBUG_STREAM("Return success of MoveIt execution of plan: " << success);
   } else {
-    ROS_DEBUG_STREAM("Failed to find a plan for pose: " << object_pose_);
+    ROS_DEBUG_STREAM("Failed to find a plan for pose: "
+                     << pick_place_goal_.object_pose);
   }
 
   if (success) {

@@ -1,8 +1,5 @@
 # Goal
-# PICK = 0
-# PLACE = 1
-uint8 request
-geometry_msgs/Pose object_pose
+pr2_picknplace_msgs/PicknPlaceGoal goal
 ---
 # Result
 bool success

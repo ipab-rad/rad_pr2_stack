@@ -19,6 +19,7 @@
 // Messages
 #include <geometry_msgs/Pose.h>
 #include <pr2_picknplace_msgs/PickPlaceAction.h>
+#include <pr2_picknplace_msgs/PicknPlaceGoal.h>
 
 // MoveIt
 #include <moveit/move_group_interface/move_group.h>
@@ -58,8 +59,7 @@ class PickPlaceAction {
     bool going;
 
     // Variables
-    uint8_t request_;
-    geometry_msgs::Pose object_pose_;
+    pr2_picknplace_msgs::PicknPlaceGoal pick_place_goal_;
     moveit::planning_interface::MoveGroup move_group_right_arm;
     moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
     // ros::Publisher display_publisher;
