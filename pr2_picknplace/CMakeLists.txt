@@ -5,7 +5,9 @@ project(pr2_picknplace)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  pr2_picknplace_msgs
   actionlib
+  geometry_msgs
   move_base_msgs
   moveit_msgs
   std_msgs
@@ -101,9 +103,9 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
-#  INCLUDE_DIRS include
+ INCLUDE_DIRS include
 #  LIBRARIES pr2_picknplace
-#  CATKIN_DEPENDS actionlib move_base_msgs moveit_msgs std_msgs
+ CATKIN_DEPENDS pr2_picknplace_msgs actionlib move_base_msgs moveit_msgs std_msgs
 #  DEPENDS system_lib
 )
 
@@ -115,6 +117,7 @@ catkin_package(
 ## Your package locations should be listed before other locations
 # include_directories(include)
 include_directories(
+  include
   ${catkin_INCLUDE_DIRS}
 )
 
@@ -129,16 +132,19 @@ include_directories(
 # add_dependencies(pr2_picknplace ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
-# add_executable(pr2_picknplace_node src/pr2_picknplace_node.cpp)
+add_executable(pr2_picknplace
+  src/pr2_picknplace.cpp
+  src/pick_place.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
-# add_dependencies(pr2_picknplace_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(pr2_picknplace
+  pr2_picknplace_msgs_gencpp)
 
 ## Specify libraries to link a library or executable target against
-# target_link_libraries(pr2_picknplace_node
-#   ${catkin_LIBRARIES}
-# )
+target_link_libraries(pr2_picknplace
+  ${catkin_LIBRARIES}
+)
 
 #############
 ## Install ##
