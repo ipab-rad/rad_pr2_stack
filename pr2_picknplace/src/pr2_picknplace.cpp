@@ -13,8 +13,8 @@
 int main(int argc, char** argv) {
   ros::init(argc, argv, "pr2_picknplace");
   ros::NodeHandle nh("~");
-  // ros::AsyncSpinner spinner(2);
-  // spinner.start();
+  ros::AsyncSpinner spinner(2);
+  spinner.start();
   PickPlaceAction pick_place(nh, "pick_place");
 
   ros::Rate r(10);

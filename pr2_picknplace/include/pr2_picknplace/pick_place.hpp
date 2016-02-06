@@ -59,6 +59,7 @@ class PickPlaceAction {
     bool going;
 
     // Variables
+    double max_planning_time;
     pr2_picknplace_msgs::PicknPlaceGoal pick_place_goal_;
     moveit::planning_interface::MoveGroup move_group_right_arm;
     moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
