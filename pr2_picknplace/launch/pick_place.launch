@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+
+<launch>
+        <group ns="pick_place">
+                <rosparam file="$(find pr2_picknplace)/cfg/picknplace_config.yaml" command="load" />
+        </group>
+        <node name="pr2_picknplace" pkg="pr2_picknplace" type="pr2_picknplace" output="screen" clear_params="true">
+        </node>
+</launch>

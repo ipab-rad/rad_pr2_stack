@@ -58,7 +58,11 @@ class PickPlaceAction {
     // Flags
     bool going;
 
+    // Parameters
+    bool add_table_;
+
     // Variables
+    std::string ns_;
     double max_planning_time;
     pr2_picknplace_msgs::PicknPlaceGoal pick_place_goal_;
     moveit::planning_interface::MoveGroup move_group_right_arm;

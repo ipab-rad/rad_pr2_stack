@@ -17,14 +17,14 @@ PickPlaceAction::PickPlaceAction(ros::NodeHandle& nh, std::string name) :
   as_.registerGoalCallback(boost::bind(&PickPlaceAction::goalCB, this));
   as_.registerPreemptCallback(boost::bind(&PickPlaceAction::preemptCB, this));
 
-  ROS_INFO("[PICKPLACEACTION] Loading parameters.");
+  ns_ = ros::this_node::getNamespace() + name;
+
   this->loadParams();
   this->init();
   this->rosSetup();
 
-  ros::Duration(1.0).sleep();
+  // ros::Duration(1.0).sleep();
 
-  this->AddCollisionObjs();
   ROS_INFO("[PICKPLACEACTION] Starting PickPlace action server.");
   as_.start();
 }
@@ -34,11 +34,13 @@ PickPlaceAction::~PickPlaceAction() {
 }
 
 void PickPlaceAction::loadParams() {
-  if (!nh_.getParam("max_planning_time", max_planning_time)) {
-    ROS_WARN("[PICKPLACEACTION] Cannot read max_planning_time parameter. "
-             "Setting to 10 sec.");
-    max_planning_time = 10.0d;
+  ROS_INFO("[PICKPLACEACTION] Loading parameters.");
+  if (!nh_.getParam(ns_ + "/max_planning_time", max_planning_time)) {
+    ROS_WARN("[PICKPLACEACTION] WARNING: Parameters were not loaded! Using default.");
   }
+  ros::param::param(ns_ + "/max_planning_time", max_planning_time, 10.0);
+  ros::param::param(ns_ + "/add_table", add_table_, true);
+  ROS_INFO_STREAM(max_planning_time << add_table_);
 }
 
 void PickPlaceAction::init() {
@@ -81,6 +83,7 @@ void PickPlaceAction::executeCB() {
   ROS_INFO("[PICKPLACEACTION] Executing goal for %s", action_name_.c_str());
   // bool going = true;
   bool success = true;
+  if (add_table_) {this->AddCollisionObjs();}
 
   if (as_.isPreemptRequested() || !ros::ok()) {
     ROS_INFO("[PICKPLACEACTION] %s: Preempted", action_name_.c_str());
