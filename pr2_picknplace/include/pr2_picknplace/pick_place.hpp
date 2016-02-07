@@ -28,6 +28,7 @@
 #include <moveit_msgs/DisplayTrajectory.h>
 #include <moveit_msgs/AttachedCollisionObject.h>
 #include <moveit_msgs/CollisionObject.h>
+#include <moveit_msgs/PlanningScene.h>
 
 class PickPlaceAction {
   protected:
@@ -66,12 +67,16 @@ class PickPlaceAction {
     double max_planning_time;
     pr2_picknplace_msgs::PicknPlaceGoal pick_place_goal_;
     moveit::planning_interface::MoveGroup move_group_right_arm;
-    moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
+    ros::Publisher pub_co;
+    ros::Publisher pub_aco;
+    // moveit::planning_interface::PlanningSceneInterface planning_scene_interface;
+    // moveit_msgs::PlanningScene planning_scene;
     // ros::Publisher display_publisher;
     // moveit_msgs::DisplayTrajectory display_trajectory;
 
     // Methods
     void AddCollisionObjs();
+    void AddAttachedCollBox(geometry_msgs::Pose p);
 };
 
 #endif  /* PICK_PLACE_HPP */

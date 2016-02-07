@@ -7,6 +7,7 @@
  */
 
 #include "pr2_picknplace/pick_place.hpp"
+#include <geometric_shapes/solid_primitive_dims.h>
 
 PickPlaceAction::PickPlaceAction(ros::NodeHandle& nh, std::string name) :
   nh_(nh),
@@ -47,6 +48,9 @@ void PickPlaceAction::init() {
 }
 
 void PickPlaceAction::rosSetup() {
+  pub_co = nh_.advertise<moveit_msgs::CollisionObject>("collision_object", 10);
+  pub_aco = nh_.advertise<moveit_msgs::AttachedCollisionObject>(
+              "attached_collision_object", 10);
   // display_publisher =
   //   node_handle.advertise<moveit_msgs::DisplayTrajectory>(
   //     "/move_group/display_planned_path", 1, true);
@@ -61,8 +65,8 @@ void PickPlaceAction::rosSetup() {
   ROS_DEBUG("[PICKPLACEACTION] Reference frame: %s",
             move_group_right_arm.getEndEffectorLink().c_str());
   // ROS_INFO_STREAM("State: " << *move_group_right_arm.getCurrentState());
-  ROS_DEBUG_STREAM("[PICKPLACEACTION] Current pose" <<
-                   move_group_right_arm.getCurrentPose().pose);
+  ROS_INFO_STREAM("[PICKPLACEACTION] Current pose" <<
+                  move_group_right_arm.getCurrentPose().pose);
 }
 
 void PickPlaceAction::goalCB() {
@@ -130,18 +134,23 @@ void PickPlaceAction::executeCB() {
 void PickPlaceAction::AddCollisionObjs() {
   moveit_msgs::CollisionObject collision_object;
   collision_object.header.frame_id = move_group_right_arm.getPlanningFrame();
+  collision_object.header.stamp = ros::Time::now();
 
-  /* The id of the object is used to identify it. */
+  // The id of the object is used to identify it.
   collision_object.id = "table_top";
+  // Remove any previous occurances in the world
+  collision_object.operation = moveit_msgs::CollisionObject::REMOVE;
+  pub_co.publish(collision_object);
 
-  /* Define a box to add to the world. */
+  // Define a box to add to the world.
   shape_msgs::SolidPrimitive primitive;
   primitive.type = primitive.CYLINDER;
-  primitive.dimensions.resize(2);
-  primitive.dimensions[0] = 0.0254;  // Height of cylinder
-  primitive.dimensions[1] = 0.6;    // Radius
+  primitive.dimensions.resize(
+    geometric_shapes::SolidPrimitiveDimCount<shape_msgs::SolidPrimitive::CYLINDER>::value);
+  primitive.dimensions[shape_msgs::SolidPrimitive::CYLINDER_HEIGHT] = 0.0254;
+  primitive.dimensions[shape_msgs::SolidPrimitive::CYLINDER_RADIUS] = 0.6;
 
-  /* A pose for the box (specified relative to frame_id) */
+  // A pose for the box (specified relative to frame_id)
   geometry_msgs::Pose table_top_pose;
   table_top_pose.orientation.w = 1.0;
   table_top_pose.position.x =  1.0;
@@ -152,9 +161,42 @@ void PickPlaceAction::AddCollisionObjs() {
   collision_object.primitive_poses.push_back(table_top_pose);
   collision_object.operation = collision_object.ADD;
 
-  std::vector<moveit_msgs::CollisionObject> collision_objects;
-  collision_objects.push_back(collision_object);
+  pub_co.publish(collision_object);
+  ros::WallDuration(1.0).sleep();
+  ROS_INFO("[PICKPLACEACTION] Adding an object into the world ...");
+  // std::vector<moveit_msgs::CollisionObject> collision_objects;
+  // collision_objects.push_back(collision_object);
+  // planning_scene_interface.addCollisionObjects(collision_objects);
+}
 
-  ROS_INFO("Add an object into the world ...");
-  planning_scene_interface.addCollisionObjects(collision_objects);
+void PickPlaceAction::AddAttachedCollBox(geometry_msgs::Pose p) {
+  moveit_msgs::CollisionObject collision_object;
+  collision_object.id = "cube";
+  // Remove any previous occurances in the world
+  collision_object.operation = moveit_msgs::CollisionObject::REMOVE;
+  pub_co.publish(collision_object);
+
+  // Now define a AttachedCollisionObject
+  moveit_msgs::AttachedCollisionObject aco;
+  aco.object = collision_object;
+  pub_aco.publish(aco);
+
+  // Create the actual object
+  shape_msgs::SolidPrimitive primitive;
+  primitive.type = primitive.BOX;
+  primitive.dimensions.resize(
+    geometric_shapes::SolidPrimitiveDimCount<shape_msgs::SolidPrimitive::BOX>::value);
+  primitive.dimensions[shape_msgs::SolidPrimitive::BOX_X] = 0.0254;
+  primitive.dimensions[shape_msgs::SolidPrimitive::BOX_Y] = 0.0254;
+  primitive.dimensions[shape_msgs::SolidPrimitive::BOX_Z] = 0.0254;
+
+  geometry_msgs::Pose cb_pose(p);
+  // cb_pose.position.x = 0.6;
+  // cb_pose.position.y = -0.7;
+  // cb_pose.position.z = 0.5;
+  collision_object.primitives.push_back(primitive);
+  collision_object.primitive_poses.push_back(cb_pose);
+  collision_object.operation = moveit_msgs::CollisionObject::ADD;
+  pub_co.publish(collision_object);
+  ros::WallDuration(1.0).sleep();
 }
