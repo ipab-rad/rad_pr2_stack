@@ -77,6 +77,8 @@ class PickPlaceAction {
     // Methods
     void AddCollisionObjs();
     void AddAttachedCollBox(geometry_msgs::Pose p);
+    bool PickCube(geometry_msgs::Pose p);
+    bool PlaceCube(geometry_msgs::Pose p);
 };
 
 #endif  /* PICK_PLACE_HPP */

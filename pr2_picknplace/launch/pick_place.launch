@@ -5,5 +5,7 @@
                 <rosparam file="$(find pr2_picknplace)/cfg/picknplace_config.yaml" command="load" />
         </group>
         <node name="pr2_picknplace" pkg="pr2_picknplace" type="pr2_picknplace" output="screen" clear_params="true">
+            <remap from="pr2_picknplace/collision_object" to="/collision_object" />
+            <remap from="pr2_picknplace/attached_collision_object" to="/attached_collision_object" />
         </node>
 </launch>

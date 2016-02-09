@@ -24,14 +24,23 @@ PickPlaceAction::PickPlaceAction(ros::NodeHandle& nh, std::string name) :
   this->init();
   this->rosSetup();
 
-  // ros::Duration(1.0).sleep();
+
+  std::vector<std::string> js = move_group_right_arm.getJoints();
+  for (size_t i = 0; i < js.size(); ++i) {
+    ROS_INFO_STREAM(js[i]);
+  }
+
+  if (add_table_) {
+    ros::WallDuration(1.0).sleep();
+    this->AddCollisionObjs();
+  }
 
   ROS_INFO("[PICKPLACEACTION] Starting PickPlace action server.");
   as_.start();
 }
 
 PickPlaceAction::~PickPlaceAction() {
-  ros::param::del("pick_place");
+  ros::param::del(ns_);
 }
 
 void PickPlaceAction::loadParams() {
@@ -41,7 +50,8 @@ void PickPlaceAction::loadParams() {
   }
   ros::param::param(ns_ + "/max_planning_time", max_planning_time, 10.0);
   ros::param::param(ns_ + "/add_table", add_table_, true);
-  ROS_INFO_STREAM(max_planning_time << add_table_);
+  ROS_INFO_STREAM("Planning time: " << max_planning_time <<
+                  "\nAdding table: " << add_table_);
 }
 
 void PickPlaceAction::init() {
@@ -87,7 +97,6 @@ void PickPlaceAction::executeCB() {
   ROS_INFO("[PICKPLACEACTION] Executing goal for %s", action_name_.c_str());
   // bool going = true;
   bool success = true;
-  if (add_table_) {this->AddCollisionObjs();}
 
   if (as_.isPreemptRequested() || !ros::ok()) {
     ROS_INFO("[PICKPLACEACTION] %s: Preempted", action_name_.c_str());
@@ -97,26 +106,31 @@ void PickPlaceAction::executeCB() {
   }
 
   // Call the MoveIt planning
-  ROS_INFO_STREAM("[PICKPLACEACTION] Starting MoveIt planning ...");
-  move_group_right_arm.setPoseTarget(pick_place_goal_.object_pose,
-                                     "r_wrist_roll_link");
-  moveit::planning_interface::MoveGroup::Plan obj_pose_plan;
-  success = move_group_right_arm.plan(obj_pose_plan);
-  ROS_INFO_STREAM("[PICKPLACEACTION] Planning finished: " <<
-                  ((success) ? "success" : "fail"));
+  AddAttachedCollBox(pick_place_goal_.object_pose);
+  // Wait for ros things to initialize
+  ros::WallDuration(1.0).sleep();
+  PickCube(pick_place_goal_.object_pose);
 
-  // display_trajectory.trajectory_start = obj_pose_plan.start_state_;
-  // display_trajectory.trajectory.push_back(obj_pose_plan.trajectory_);
-  // display_publisher.publish(display_trajectory);
-  if (success) {
-    ROS_INFO_STREAM("[PICKPLACEACTION] Executing on the robot ...");
-    success = move_group_right_arm.execute(obj_pose_plan);
-    ROS_INFO_STREAM("[PICKPLACEACTION] Return success of MoveIt execution of plan: "
-                    << ((success) ? "success" : "fail"));
-  } else {
-    ROS_INFO_STREAM("[PICKPLACEACTION] Failed to find a plan for pose: "
-                    << pick_place_goal_.object_pose);
-  }
+  // ROS_INFO_STREAM("[PICKPLACEACTION] Starting MoveIt planning ...");
+  // move_group_right_arm.setPoseTarget(pick_place_goal_.object_pose,
+  //                                    "r_wrist_roll_link");
+  // moveit::planning_interface::MoveGroup::Plan obj_pose_plan;
+  // success = move_group_right_arm.plan(obj_pose_plan);
+  // ROS_INFO_STREAM("[PICKPLACEACTION] Planning finished: " <<
+  //                 ((success) ? "success" : "fail"));
+
+  // // display_trajectory.trajectory_start = obj_pose_plan.start_state_;
+  // // display_trajectory.trajectory.push_back(obj_pose_plan.trajectory_);
+  // // display_publisher.publish(display_trajectory);
+  // if (success) {
+  //   ROS_INFO_STREAM("[PICKPLACEACTION] Executing on the robot ...");
+  //   success = move_group_right_arm.execute(obj_pose_plan);
+  //   ROS_INFO_STREAM("[PICKPLACEACTION] Return success of MoveIt execution of plan: "
+  //                   << ((success) ? "success" : "fail"));
+  // } else {
+  //   ROS_INFO_STREAM("[PICKPLACEACTION] Failed to find a plan for pose: "
+  //                   << pick_place_goal_.object_pose);
+  // }
 
   if (success) {
     result_.success = true;
@@ -153,7 +167,7 @@ void PickPlaceAction::AddCollisionObjs() {
   // A pose for the box (specified relative to frame_id)
   geometry_msgs::Pose table_top_pose;
   table_top_pose.orientation.w = 1.0;
-  table_top_pose.position.x =  1.0;
+  table_top_pose.position.x =  0.5;
   table_top_pose.position.y =  0.0;
   table_top_pose.position.z =  0.7;
 
@@ -162,7 +176,6 @@ void PickPlaceAction::AddCollisionObjs() {
   collision_object.operation = collision_object.ADD;
 
   pub_co.publish(collision_object);
-  ros::WallDuration(1.0).sleep();
   ROS_INFO("[PICKPLACEACTION] Adding an object into the world ...");
   // std::vector<moveit_msgs::CollisionObject> collision_objects;
   // collision_objects.push_back(collision_object);
@@ -171,6 +184,8 @@ void PickPlaceAction::AddCollisionObjs() {
 
 void PickPlaceAction::AddAttachedCollBox(geometry_msgs::Pose p) {
   moveit_msgs::CollisionObject collision_object;
+  collision_object.header.frame_id = move_group_right_arm.getPlanningFrame();
+  collision_object.header.stamp = ros::Time::now();
   collision_object.id = "cube";
   // Remove any previous occurances in the world
   collision_object.operation = moveit_msgs::CollisionObject::REMOVE;
@@ -179,7 +194,10 @@ void PickPlaceAction::AddAttachedCollBox(geometry_msgs::Pose p) {
   // Now define a AttachedCollisionObject
   moveit_msgs::AttachedCollisionObject aco;
   aco.object = collision_object;
+  // aco.link_name = "r_wrist_roll_link";
+  ROS_INFO_STREAM(aco);
   pub_aco.publish(aco);
+  ros::WallDuration(1.0).sleep();
 
   // Create the actual object
   shape_msgs::SolidPrimitive primitive;
@@ -191,12 +209,95 @@ void PickPlaceAction::AddAttachedCollBox(geometry_msgs::Pose p) {
   primitive.dimensions[shape_msgs::SolidPrimitive::BOX_Z] = 0.0254;
 
   geometry_msgs::Pose cb_pose(p);
-  // cb_pose.position.x = 0.6;
-  // cb_pose.position.y = -0.7;
-  // cb_pose.position.z = 0.5;
+
   collision_object.primitives.push_back(primitive);
   collision_object.primitive_poses.push_back(cb_pose);
   collision_object.operation = moveit_msgs::CollisionObject::ADD;
   pub_co.publish(collision_object);
+
+
   ros::WallDuration(1.0).sleep();
+}
+
+bool PickPlaceAction::PickCube(geometry_msgs::Pose p) {
+  std::vector<moveit_msgs::Grasp> grasps;
+
+  geometry_msgs::PoseStamped ps;
+  ps.header.frame_id = move_group_right_arm.getPlanningFrame();
+  ps.pose = p;
+  moveit_msgs::Grasp g;
+  g.grasp_pose = ps;
+
+  g.pre_grasp_approach.direction.vector.x = 1.0;
+  g.pre_grasp_approach.direction.header.frame_id = "r_wrist_roll_link";
+  g.pre_grasp_approach.min_distance = 0.2;
+  g.pre_grasp_approach.desired_distance = 0.4;
+
+  g.post_grasp_retreat.direction.header.frame_id =
+    move_group_right_arm.getPlanningFrame();
+  g.post_grasp_retreat.direction.vector.z = 1.0;
+  g.post_grasp_retreat.min_distance = 0.1;
+  g.post_grasp_retreat.desired_distance = 0.25;
+
+  g.pre_grasp_posture.joint_names.resize(1, "r_gripper_joint"); //r_gripper_joint
+  g.pre_grasp_posture.points.resize(1);
+  g.pre_grasp_posture.points[0].positions.resize(1);
+  g.pre_grasp_posture.points[0].positions[0] = 1;
+
+  g.grasp_posture.joint_names.resize(1, "r_gripper_joint"); //r_gripper_joint
+  g.grasp_posture.points.resize(1);
+  g.grasp_posture.points[0].positions.resize(1);
+  g.grasp_posture.points[0].positions[0] = 0;
+
+  grasps.push_back(g);
+  move_group_right_arm.setSupportSurfaceName("table_top");
+  return move_group_right_arm.pick("cube", grasps);
+}
+
+bool PickPlaceAction::PlaceCube(geometry_msgs::Pose p) {
+  std::vector<moveit_msgs::PlaceLocation> loc;
+
+  geometry_msgs::PoseStamped ps;
+  ps.header.frame_id = "base_footprint";
+  ps.pose = p;
+  moveit_msgs::PlaceLocation g;
+  g.place_pose = ps;
+
+  g.pre_place_approach.direction.vector.z = -1.0;
+  g.post_place_retreat.direction.vector.x = -1.0;
+  g.post_place_retreat.direction.header.frame_id =
+    move_group_right_arm.getPlanningFrame();
+  g.pre_place_approach.direction.header.frame_id = "r_wrist_roll_link";
+  g.pre_place_approach.min_distance = 0.1;
+  g.pre_place_approach.desired_distance = 0.2;
+  g.post_place_retreat.min_distance = 0.1;
+  g.post_place_retreat.desired_distance = 0.25;
+
+  g.post_place_posture.joint_names.resize(1, "r_gripper_joint");
+  g.post_place_posture.points.resize(1);
+  g.post_place_posture.points[0].positions.resize(1);
+  g.post_place_posture.points[0].positions[0] = 1;
+
+  loc.push_back(g);
+  move_group_right_arm.setSupportSurfaceName("table_top");
+
+
+  // add path constraints
+  moveit_msgs::Constraints constr;
+  constr.orientation_constraints.resize(1);
+  moveit_msgs::OrientationConstraint& ocm = constr.orientation_constraints[0];
+  ocm.link_name = "r_wrist_roll_link";
+  ocm.header.frame_id = ps.header.frame_id;
+  ocm.orientation.x = 0.0;
+  ocm.orientation.y = 0.0;
+  ocm.orientation.z = 0.0;
+  ocm.orientation.w = 1.0;
+  ocm.absolute_x_axis_tolerance = 0.2;
+  ocm.absolute_y_axis_tolerance = 0.2;
+  ocm.absolute_z_axis_tolerance = M_PI;
+  ocm.weight = 1.0;
+  //  move_group_right_arm.setPathConstraints(constr);
+  move_group_right_arm.setPlannerId("RRTConnectkConfigDefault");
+
+  return move_group_right_arm.place("cube", loc);
 }
