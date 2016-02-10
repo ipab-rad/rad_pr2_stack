@@ -7,7 +7,6 @@
  */
 
 #include "pr2_picknplace/pick_place.hpp"
-#include <geometric_shapes/solid_primitive_dims.h>
 
 PickPlaceAction::PickPlaceAction(ros::NodeHandle& nh, std::string name) :
   nh_(nh),
@@ -31,7 +30,7 @@ PickPlaceAction::PickPlaceAction(ros::NodeHandle& nh, std::string name) :
   }
 
   if (add_table_) {
-    ros::WallDuration(wait_).sleep();
+    ros::WallDuration(co_wait_).sleep();
     this->AddCollisionObjs();
   }
 
@@ -50,12 +49,17 @@ void PickPlaceAction::loadParams() {
   }
   ros::param::param(ns_ + "/max_planning_time", max_planning_time, 10.0);
   ros::param::param(ns_ + "/add_table", add_table_, true);
+  ros::param::param(ns_ + "/open_gripper_pos", open_gripper_pos_, 0.08);
+  ros::param::param(ns_ + "/close_gripper_pos", close_gripper_pos_, 0.00);
   ROS_INFO_STREAM("Planning time: " << max_planning_time <<
-                  ", Adding table: " << (add_table_ ? "True" : "False"));
+                  ", Adding table: " << (add_table_ ? "True" : "False") <<
+                  ", OpenGripperPos: " << open_gripper_pos_ <<
+                  ", CloseGripperPos: " << close_gripper_pos_);
 }
 
 void PickPlaceAction::init() {
-  wait_ = 1.0f;
+  co_wait_ = 1.0f;
+  exec_wait_ = 0.0f;
 }
 
 void PickPlaceAction::rosSetup() {
@@ -118,10 +122,17 @@ void PickPlaceAction::executeCB() {
   // Call the MoveIt planning
   // AddAttachedCollBox(pick_place_goal_.object_pose);
   // Wait for ros things to initialize
-  // ros::WallDuration(1.0).sleep();
-  PickCube(pick_place_goal_.object_pose);
-
-
+  switch (pick_place_goal_.request) {
+  case picknplace::REQUEST_PICK:
+    PickCube(pick_place_goal_.object_pose);
+    break;
+  case picknplace::REQUEST_PLACE:
+    PlaceCube(pick_place_goal_.object_pose);
+    break;
+  case picknplace::REQUEST_MOVE:
+    ROS_WARN("Move Request not implemented yet.");
+    break;
+  }
 
   if (success) {
     result_.success = true;
@@ -132,7 +143,6 @@ void PickPlaceAction::executeCB() {
     ROS_INFO("[PICKPLACEACTION] %s: Failed!", action_name_.c_str());
     as_.setSucceeded(result_);
   }
-
 }
 
 void PickPlaceAction::AddCollisionObjs() {
@@ -197,19 +207,18 @@ void PickPlaceAction::AddAttachedCollBox(geometry_msgs::Pose p) {
   collision_object.operation = moveit_msgs::CollisionObject::ADD;
   pub_co.publish(collision_object);
 
-  ros::WallDuration(1.0).sleep();
+  ros::WallDuration(co_wait_).sleep();
   // Now define a AttachedCollisionObject
   moveit_msgs::AttachedCollisionObject aco;
   aco.object = collision_object;
   aco.link_name = "r_wrist_roll_link";
   ROS_INFO_STREAM("Atatchable object: " << aco);
   pub_aco.publish(aco);
-  ros::WallDuration(wait_).sleep();
-
+  ros::WallDuration(co_wait_).sleep();
 }
 
 bool PickPlaceAction::PickCube(geometry_msgs::Pose p) {
-  ROS_INFO_STREAM("[PICKPLACEACTION] Starting MoveIt planning ...");
+  ROS_INFO_STREAM("[PICKPLACEACTION] Starting Pick planning ...");
   moveit::planning_interface::MoveGroup::Plan pregrasp_plan;
   moveit::planning_interface::MoveGroup::Plan grasp_plan;
   moveit::planning_interface::MoveGroup::Plan postgrasp_plan;
@@ -230,31 +239,29 @@ bool PickPlaceAction::PickCube(geometry_msgs::Pose p) {
                       pregrasp_plan);
   ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'pregrasp': " <<
                   ((success) ? "success" : "fail"));
-  success &= Plan(pregrasp_robot_state,
-                  grasp_robot_state,
-                  grasp_plan,
-                  p.orientation);
+  success &= Plan(pregrasp_robot_state, grasp_robot_state,
+                  grasp_plan, p.orientation);
   ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'grasp': " <<
                   ((success) ? "success" : "fail"));
-  success &= Plan(grasp_robot_state,
-                  postgrasp_robot_state,
-                  postgrasp_plan);
+  success &= Plan(grasp_robot_state, postgrasp_robot_state, postgrasp_plan);
   ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'postgrasp': " <<
                   ((success) ? "success" : "fail"));
 
   if (success) {
     ROS_INFO_STREAM("[PICKPLACEACTION] Executing on the robot ...");
-    success = move_group_right_arm.execute(pregrasp_plan);
-    ros::WallDuration(0.5).sleep();
+    SendGripperCommand(open_gripper_pos_);
 
-    if (success) { success &= GripperCommand(OPEN_GRIPPER_POS); }
-    ros::WallDuration(0.5).sleep();
+    success = move_group_right_arm.execute(pregrasp_plan);
+    ros::WallDuration(exec_wait_).sleep();
+
+    if (success) { success &= CheckGripperFinished();}
 
     if (success) { success &= move_group_right_arm.execute(grasp_plan); }
-    ros::WallDuration(0.5).sleep();
+    ros::WallDuration(exec_wait_).sleep();
 
-    if (success) { success &= GripperCommand(CUBE_GRIPPER_POS, 50.0); }
-    ros::WallDuration(0.5).sleep();
+    SendGripperCommand(close_gripper_pos_, 50.0);
+
+    if (success) { success &= CheckGripperFinished(); }
 
     if (success) { success &= move_group_right_arm.execute(postgrasp_plan); }
     ROS_INFO_STREAM("[PICKPLACEACTION] MoveIt execution of plan: "
@@ -267,51 +274,55 @@ bool PickPlaceAction::PickCube(geometry_msgs::Pose p) {
 }
 
 bool PickPlaceAction::PlaceCube(geometry_msgs::Pose p) {
-  std::vector<moveit_msgs::PlaceLocation> loc;
+  ROS_INFO_STREAM("[PICKPLACEACTION] Starting Place planning ...");
+  moveit::planning_interface::MoveGroup::Plan preplace_plan;
+  moveit::planning_interface::MoveGroup::Plan place_plan;
+  moveit::planning_interface::MoveGroup::Plan postplace_plan;
 
-  geometry_msgs::PoseStamped ps;
-  ps.header.frame_id = "base_footprint";
-  ps.pose = p;
-  moveit_msgs::PlaceLocation g;
-  g.place_pose = ps;
+  geometry_msgs::Pose preplace_pose(p);
+  preplace_pose.position.z += 0.1;
+  geometry_msgs::Pose postplace_pose(p);
+  postplace_pose.position.z += 0.1;
 
-  g.pre_place_approach.direction.vector.z = -1.0;
-  g.post_place_retreat.direction.vector.x = -1.0;
-  g.post_place_retreat.direction.header.frame_id =
-    move_group_right_arm.getPlanningFrame();
-  g.pre_place_approach.direction.header.frame_id = "r_wrist_roll_link";
-  g.pre_place_approach.min_distance = 0.1;
-  g.pre_place_approach.desired_distance = 0.2;
-  g.post_place_retreat.min_distance = 0.1;
-  g.post_place_retreat.desired_distance = 0.25;
+  moveit::core::RobotState preplace_robot_state = RobotStateFromPose(
+                                                    preplace_pose);
+  moveit::core::RobotState place_robot_state = RobotStateFromPose(p);
+  moveit::core::RobotState postplace_robot_state = RobotStateFromPose(
+                                                     postplace_pose);
 
-  g.post_place_posture.joint_names.resize(1, "r_gripper_joint");
-  g.post_place_posture.points.resize(1);
-  g.post_place_posture.points[0].positions.resize(1);
-  g.post_place_posture.points[0].positions[0] = 1;
+  bool success = Plan(*move_group_right_arm.getCurrentState(),
+                      preplace_robot_state,
+                      preplace_plan);
+  ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'preplace': " <<
+                  ((success) ? "success" : "fail"));
+  success &= Plan(preplace_robot_state, place_robot_state,
+                  place_plan, p.orientation);
+  ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'place': " <<
+                  ((success) ? "success" : "fail"));
+  success &= Plan(place_robot_state, postplace_robot_state, postplace_plan);
+  ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'postplace': " <<
+                  ((success) ? "success" : "fail"));
 
-  loc.push_back(g);
-  move_group_right_arm.setSupportSurfaceName("table_top");
+  if (success) {
+    ROS_INFO_STREAM("[PICKPLACEACTION] Executing on the robot ...");
+    success = move_group_right_arm.execute(preplace_plan);
+    ros::WallDuration(exec_wait_).sleep();
 
+    if (success) { success &= move_group_right_arm.execute(place_plan); }
+    ros::WallDuration(exec_wait_).sleep();
 
-  // add path constraints
-  moveit_msgs::Constraints constr;
-  constr.orientation_constraints.resize(1);
-  moveit_msgs::OrientationConstraint& ocm = constr.orientation_constraints[0];
-  ocm.link_name = "r_wrist_roll_link";
-  ocm.header.frame_id = ps.header.frame_id;
-  ocm.orientation.x = 0.0;
-  ocm.orientation.y = 0.0;
-  ocm.orientation.z = 0.0;
-  ocm.orientation.w = 1.0;
-  ocm.absolute_x_axis_tolerance = 0.2;
-  ocm.absolute_y_axis_tolerance = 0.2;
-  ocm.absolute_z_axis_tolerance = M_PI;
-  ocm.weight = 1.0;
-  //  move_group_right_arm.setPathConstraints(constr);
-  move_group_right_arm.setPlannerId("RRTConnectkConfigDefault");
+    SendGripperCommand(open_gripper_pos_);
 
-  return move_group_right_arm.place("cube", loc);
+    if (success) { success &= CheckGripperFinished(); }
+
+    if (success) { success &= move_group_right_arm.execute(postplace_plan); }
+    ROS_INFO_STREAM("[PICKPLACEACTION] MoveIt execution of plan: "
+                    << ((success) ? "success" : "fail"));
+  } else {
+    ROS_INFO_STREAM("[PICKPLACEACTION] Failed to find a plan for pose: "
+                    << pick_place_goal_.object_pose);
+  }
+  return success;
 }
 
 bool PickPlaceAction::Plan(moveit::core::RobotState start,
@@ -355,13 +366,16 @@ moveit::core::RobotState PickPlaceAction::RobotStateFromPose(
   return state;
 }
 
-bool PickPlaceAction::GripperCommand(float position, float max_effort) {
+void PickPlaceAction::SendGripperCommand(float position, float max_effort) {
   pr2_controllers_msgs::Pr2GripperCommandGoal cm;
   cm.command.position = position;
   cm.command.max_effort = max_effort;
   ROS_INFO("Sending gripper command");
   gripper_client_->sendGoal(cm);
-  gripper_client_->waitForResult();
+}
+
+bool PickPlaceAction::CheckGripperFinished() {
+  gripper_client_->waitForResult(ros::Duration(max_planning_time));
   if (gripper_client_->getState() ==
       actionlib::SimpleClientGoalState::SUCCEEDED) {
     return true;

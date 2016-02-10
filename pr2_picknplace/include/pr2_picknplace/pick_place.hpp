@@ -70,29 +70,41 @@ class PickPlaceAction {
               geometry_msgs::Quaternion orient_constraint = geometry_msgs::Quaternion());
     moveit::core::RobotState RobotStateFromPose(geometry_msgs::Pose p);
 
-    bool GripperCommand(float position, float max_effort = -1.0f);
+    void SendGripperCommand(float position, float max_effort = -1.0f);
+    bool CheckGripperFinished();
 
     // Flags
-    bool going;
+    // bool going;
 
     // Parameters
     bool add_table_;
+    double max_planning_time;
+    double open_gripper_pos_;
+    double close_gripper_pos_;
 
     // Constants
-    const float CLOSE_GRIPPER_POS = 0.00f;
-    const float OPEN_GRIPPER_POS = 0.08f;
-    float CUBE_GRIPPER_POS = 0.025f;
+    // const float CLOSE_GRIPPER_POS = 0.00f;
+    // const float OPEN_GRIPPER_POS = 0.08f;
+    // const float CUBE_GRIPPER_POS = 0.025f;
 
     // Variables
     std::string ns_;
-    float wait_;
-    double max_planning_time;
+    float co_wait_;
+    float exec_wait_;
     pr2_picknplace_msgs::PicknPlaceGoal pick_place_goal_;
     moveit::planning_interface::MoveGroup move_group_right_arm;
     ros::Publisher pub_co;
     ros::Publisher pub_aco;
     actionlib::SimpleActionClient<pr2_controllers_msgs::Pr2GripperCommandAction>*
     gripper_client_;
+};
+
+namespace picknplace {
+enum request {
+    REQUEST_PICK = 0,
+    REQUEST_PLACE = 1,
+    REQUEST_MOVE = 2
+};
 };
 
 #endif  /* PICK_PLACE_HPP */

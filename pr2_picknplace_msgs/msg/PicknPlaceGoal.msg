@@ -1,4 +1,5 @@
-# PICK = 0
-# PLACE = 1
+# uint8 PICK_REQUEST = 0
+# uint8 PLACE_REQUEST = 1
+# uint8 MOVE_REQUEST = 2
 uint8 request
 geometry_msgs/Pose object_pose
