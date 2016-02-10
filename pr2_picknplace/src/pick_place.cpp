@@ -111,13 +111,10 @@ void PickPlaceAction::executeCB() {
   // ros::WallDuration(1.0).sleep();
   // PickCube(pick_place_goal_.object_pose);
 
-  // ROS_INFO_STREAM("[PICKPLACEACTION] Starting MoveIt planning ...");
-  // move_group_right_arm.setPoseTarget(pick_place_goal_.object_pose,
-  //                                    "r_wrist_roll_link");
+  ROS_INFO_STREAM("[PICKPLACEACTION] Starting MoveIt planning ...");
   moveit::planning_interface::MoveGroup::Plan pregrasp_plan;
   moveit::planning_interface::MoveGroup::Plan grasp_plan;
   moveit::planning_interface::MoveGroup::Plan postgrasp_plan;
-  // success = move_group_right_arm.plan(obj_pose_plan);
 
   // display_trajectory.trajectory_start = obj_pose_plan.start_state_;
   // display_trajectory.trajectory.push_back(obj_pose_plan.trajectory_);
@@ -136,28 +133,28 @@ void PickPlaceAction::executeCB() {
   success = Plan(*move_group_right_arm.getCurrentState(),
                  pregrasp_robot_state,
                  pregrasp_plan);
-  ROS_INFO_STREAM("[PICKPLACEACTION] Planning finished 'pregrasp': " <<
+  ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'pregrasp': " <<
                   ((success) ? "success" : "fail"));
   success &= Plan(pregrasp_robot_state,
                   RobotStateFromPose(pick_place_goal_.object_pose),
-                  grasp_plan);
-  ROS_INFO_STREAM("[PICKPLACEACTION] Planning finished 'grasp': " <<
+                  grasp_plan,
+                  pick_place_goal_.object_pose.orientation);
+  ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'grasp': " <<
                   ((success) ? "success" : "fail"));
   success &= Plan(RobotStateFromPose(pick_place_goal_.object_pose),
                   postgrasp_robot_state,
                   postgrasp_plan);
-  ROS_INFO_STREAM("[PICKPLACEACTION] Planning finished 'postgrasp': " <<
+  ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'postgrasp': " <<
                   ((success) ? "success" : "fail"));
 
   if (success) {
     ROS_INFO_STREAM("[PICKPLACEACTION] Executing on the robot ...");
     success = move_group_right_arm.execute(pregrasp_plan);
-    ROS_INFO_STREAM("WAITING!!!");
     ros::WallDuration(1.0).sleep();
-    if (success) {success &= move_group_right_arm.execute(grasp_plan); }
+    if (success) { success &= move_group_right_arm.execute(grasp_plan); }
     ros::WallDuration(1.0).sleep();
-    if (success) {success &= move_group_right_arm.execute(postgrasp_plan); }
-    ROS_INFO_STREAM("[PICKPLACEACTION] Return success of MoveIt execution of plan: "
+    if (success) { success &= move_group_right_arm.execute(postgrasp_plan); }
+    ROS_INFO_STREAM("[PICKPLACEACTION] MoveIt execution of plan: "
                     << ((success) ? "success" : "fail"));
   } else {
     ROS_INFO_STREAM("[PICKPLACEACTION] Failed to find a plan for pose: "
@@ -223,7 +220,6 @@ void PickPlaceAction::AddAttachedCollBox(geometry_msgs::Pose p) {
   collision_object.operation = moveit_msgs::CollisionObject::REMOVE;
   pub_co.publish(collision_object);
 
-
   // Create the actual object
   shape_msgs::SolidPrimitive primitive;
   primitive.type = primitive.BOX;
@@ -239,7 +235,6 @@ void PickPlaceAction::AddAttachedCollBox(geometry_msgs::Pose p) {
   collision_object.primitive_poses.push_back(cb_pose);
   collision_object.operation = moveit_msgs::CollisionObject::ADD;
   pub_co.publish(collision_object);
-
 
   ros::WallDuration(1.0).sleep();
   // Now define a AttachedCollisionObject
@@ -337,17 +332,15 @@ bool PickPlaceAction::PlaceCube(geometry_msgs::Pose p) {
 bool PickPlaceAction::Plan(moveit::core::RobotState start,
                            moveit::core::RobotState end,
                            moveit::planning_interface::MoveGroup::Plan& plan,
-                           bool constrained) {
-  if (constrained) {
+                           geometry_msgs::Quaternion orient_constraint) {
+  if (orient_constraint.x != 0.0f && orient_constraint.y != 0.0f &&
+      orient_constraint.z != 0.0f && orient_constraint.w != 0.0f) {
     moveit_msgs::OrientationConstraint ocm;
     ocm.link_name = "r_wrist_roll_link";
     ocm.header.frame_id = move_group_right_arm.getPlanningFrame();
     // Set the orientation of the final pose
-    // ocm.orientation = end.orientation;
+    ocm.orientation = orient_constraint;
 
-    // ocm.absolute_x_axis_tolerance = 0.1;
-    // ocm.absolute_y_axis_tolerance = 0.1;
-    // ocm.absolute_z_axis_tolerance = 0.1;
     ocm.weight = 1.0;
     //Set path constraint
     moveit_msgs::Constraints test_constraints;
@@ -359,8 +352,8 @@ bool PickPlaceAction::Plan(moveit::core::RobotState start,
   move_group_right_arm.setJointValueTarget(end);
   bool success = move_group_right_arm.plan(plan);
 
-
-  if (constrained) {
+  if (orient_constraint.x != 0.0f && orient_constraint.y != 0.0f &&
+      orient_constraint.z != 0.0f && orient_constraint.w != 0.0f) {
     // Clear path constraint
     move_group_right_arm.clearPathConstraints();
   }
