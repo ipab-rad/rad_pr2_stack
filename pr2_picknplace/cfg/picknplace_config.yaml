@@ -1,2 +1,2 @@
-add_table: false
+add_table: true
 max_planning_time: 10.0

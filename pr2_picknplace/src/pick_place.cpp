@@ -77,6 +77,15 @@ void PickPlaceAction::rosSetup() {
   // ROS_INFO_STREAM("State: " << *move_group_right_arm.getCurrentState());
   ROS_INFO_STREAM("[PICKPLACEACTION] Current pose" <<
                   move_group_right_arm.getCurrentPose().pose);
+
+  gripper_client_ = new
+  actionlib::SimpleActionClient<pr2_controllers_msgs::Pr2GripperCommandAction>(
+    "r_gripper_controller/gripper_action", true);
+
+  //wait for the gripper action server to come up
+  while (!gripper_client_->waitForServer(ros::Duration(5.0))) {
+    ROS_INFO("Waiting for the r_gripper_controller/gripper_action action server to come up");
+  }
 }
 
 void PickPlaceAction::goalCB() {
@@ -109,57 +118,9 @@ void PickPlaceAction::executeCB() {
   // AddAttachedCollBox(pick_place_goal_.object_pose);
   // Wait for ros things to initialize
   // ros::WallDuration(1.0).sleep();
-  // PickCube(pick_place_goal_.object_pose);
+  PickCube(pick_place_goal_.object_pose);
 
-  ROS_INFO_STREAM("[PICKPLACEACTION] Starting MoveIt planning ...");
-  moveit::planning_interface::MoveGroup::Plan pregrasp_plan;
-  moveit::planning_interface::MoveGroup::Plan grasp_plan;
-  moveit::planning_interface::MoveGroup::Plan postgrasp_plan;
 
-  // display_trajectory.trajectory_start = obj_pose_plan.start_state_;
-  // display_trajectory.trajectory.push_back(obj_pose_plan.trajectory_);
-  // display_publisher.publish(display_trajectory);
-
-  geometry_msgs::Pose pregrasp_pose(pick_place_goal_.object_pose);
-  pregrasp_pose.position.z += 0.1;
-  geometry_msgs::Pose postgrasp_pose(pick_place_goal_.object_pose);
-  postgrasp_pose.position.z += 0.1;
-
-  moveit::core::RobotState pregrasp_robot_state = RobotStateFromPose(
-                                                    pregrasp_pose);
-  moveit::core::RobotState postgrasp_robot_state = RobotStateFromPose(
-                                                     postgrasp_pose);
-
-  success = Plan(*move_group_right_arm.getCurrentState(),
-                 pregrasp_robot_state,
-                 pregrasp_plan);
-  ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'pregrasp': " <<
-                  ((success) ? "success" : "fail"));
-  success &= Plan(pregrasp_robot_state,
-                  RobotStateFromPose(pick_place_goal_.object_pose),
-                  grasp_plan,
-                  pick_place_goal_.object_pose.orientation);
-  ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'grasp': " <<
-                  ((success) ? "success" : "fail"));
-  success &= Plan(RobotStateFromPose(pick_place_goal_.object_pose),
-                  postgrasp_robot_state,
-                  postgrasp_plan);
-  ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'postgrasp': " <<
-                  ((success) ? "success" : "fail"));
-
-  if (success) {
-    ROS_INFO_STREAM("[PICKPLACEACTION] Executing on the robot ...");
-    success = move_group_right_arm.execute(pregrasp_plan);
-    ros::WallDuration(1.0).sleep();
-    if (success) { success &= move_group_right_arm.execute(grasp_plan); }
-    ros::WallDuration(1.0).sleep();
-    if (success) { success &= move_group_right_arm.execute(postgrasp_plan); }
-    ROS_INFO_STREAM("[PICKPLACEACTION] MoveIt execution of plan: "
-                    << ((success) ? "success" : "fail"));
-  } else {
-    ROS_INFO_STREAM("[PICKPLACEACTION] Failed to find a plan for pose: "
-                    << pick_place_goal_.object_pose);
-  }
 
   if (success) {
     result_.success = true;
@@ -196,8 +157,8 @@ void PickPlaceAction::AddCollisionObjs() {
   // A pose for the box (specified relative to frame_id)
   geometry_msgs::Pose table_top_pose;
   table_top_pose.orientation.w = 1.0;
-  table_top_pose.position.x =  0.5;
-  table_top_pose.position.y =  0.0;
+  table_top_pose.position.x =  0.8;
+  table_top_pose.position.y =  -0.50;
   table_top_pose.position.z =  0.7;
 
   collision_object.primitives.push_back(primitive);
@@ -247,38 +208,61 @@ void PickPlaceAction::AddAttachedCollBox(geometry_msgs::Pose p) {
 }
 
 bool PickPlaceAction::PickCube(geometry_msgs::Pose p) {
-  std::vector<moveit_msgs::Grasp> grasps;
+  ROS_INFO_STREAM("[PICKPLACEACTION] Starting MoveIt planning ...");
+  moveit::planning_interface::MoveGroup::Plan pregrasp_plan;
+  moveit::planning_interface::MoveGroup::Plan grasp_plan;
+  moveit::planning_interface::MoveGroup::Plan postgrasp_plan;
 
-  geometry_msgs::PoseStamped ps;
-  ps.header.frame_id = move_group_right_arm.getPlanningFrame();
-  ps.pose = p;
-  moveit_msgs::Grasp g;
-  g.grasp_pose = ps;
+  geometry_msgs::Pose pregrasp_pose(p);
+  pregrasp_pose.position.z += 0.1;
+  geometry_msgs::Pose postgrasp_pose(p);
+  postgrasp_pose.position.z += 0.1;
 
-  g.pre_grasp_approach.direction.vector.x = 1.0;
-  g.pre_grasp_approach.direction.header.frame_id = "r_wrist_roll_link";
-  g.pre_grasp_approach.min_distance = 0.2;
-  g.pre_grasp_approach.desired_distance = 0.4;
+  moveit::core::RobotState pregrasp_robot_state = RobotStateFromPose(
+                                                    pregrasp_pose);
+  moveit::core::RobotState grasp_robot_state = RobotStateFromPose(p);
+  moveit::core::RobotState postgrasp_robot_state = RobotStateFromPose(
+                                                     postgrasp_pose);
 
-  g.post_grasp_retreat.direction.header.frame_id =
-    move_group_right_arm.getPlanningFrame();
-  g.post_grasp_retreat.direction.vector.z = 1.0;
-  g.post_grasp_retreat.min_distance = 0.1;
-  g.post_grasp_retreat.desired_distance = 0.25;
+  bool success = Plan(*move_group_right_arm.getCurrentState(),
+                      pregrasp_robot_state,
+                      pregrasp_plan);
+  ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'pregrasp': " <<
+                  ((success) ? "success" : "fail"));
+  success &= Plan(pregrasp_robot_state,
+                  grasp_robot_state,
+                  grasp_plan,
+                  p.orientation);
+  ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'grasp': " <<
+                  ((success) ? "success" : "fail"));
+  success &= Plan(grasp_robot_state,
+                  postgrasp_robot_state,
+                  postgrasp_plan);
+  ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'postgrasp': " <<
+                  ((success) ? "success" : "fail"));
 
-  g.pre_grasp_posture.joint_names.resize(1, "r_gripper_joint"); //r_gripper_joint
-  g.pre_grasp_posture.points.resize(1);
-  g.pre_grasp_posture.points[0].positions.resize(1);
-  g.pre_grasp_posture.points[0].positions[0] = 1;
+  if (success) {
+    ROS_INFO_STREAM("[PICKPLACEACTION] Executing on the robot ...");
+    success = move_group_right_arm.execute(pregrasp_plan);
+    ros::WallDuration(0.5).sleep();
 
-  g.grasp_posture.joint_names.resize(1, "r_gripper_joint"); //r_gripper_joint
-  g.grasp_posture.points.resize(1);
-  g.grasp_posture.points[0].positions.resize(1);
-  g.grasp_posture.points[0].positions[0] = 0;
+    if (success) { success &= GripperCommand(OPEN_GRIPPER_POS); }
+    ros::WallDuration(0.5).sleep();
 
-  grasps.push_back(g);
-  move_group_right_arm.setSupportSurfaceName("table_top");
-  return move_group_right_arm.pick("cube", grasps);
+    if (success) { success &= move_group_right_arm.execute(grasp_plan); }
+    ros::WallDuration(0.5).sleep();
+
+    if (success) { success &= GripperCommand(CUBE_GRIPPER_POS, 50.0); }
+    ros::WallDuration(0.5).sleep();
+
+    if (success) { success &= move_group_right_arm.execute(postgrasp_plan); }
+    ROS_INFO_STREAM("[PICKPLACEACTION] MoveIt execution of plan: "
+                    << ((success) ? "success" : "fail"));
+  } else {
+    ROS_INFO_STREAM("[PICKPLACEACTION] Failed to find a plan for pose: "
+                    << pick_place_goal_.object_pose);
+  }
+  return success;
 }
 
 bool PickPlaceAction::PlaceCube(geometry_msgs::Pose p) {
@@ -368,4 +352,20 @@ moveit::core::RobotState PickPlaceAction::RobotStateFromPose(
     state.getJointModelGroup(move_group_right_arm.getName());
   state.setFromIK(joint_model_group, p);
   return state;
+}
+
+bool PickPlaceAction::GripperCommand(float position, float max_effort) {
+  pr2_controllers_msgs::Pr2GripperCommandGoal cm;
+  cm.command.position = position;
+  cm.command.max_effort = max_effort;
+  ROS_INFO("Sending gripper command");
+  gripper_client_->sendGoal(cm);
+  gripper_client_->waitForResult();
+  if (gripper_client_->getState() ==
+      actionlib::SimpleClientGoalState::SUCCEEDED) {
+    return true;
+  } else {
+    ROS_WARN("[PICKPLACEACTION] The gripper failed to open.");
+    return false;
+  }
 }
