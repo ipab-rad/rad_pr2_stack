@@ -106,31 +106,63 @@ void PickPlaceAction::executeCB() {
   }
 
   // Call the MoveIt planning
-  AddAttachedCollBox(pick_place_goal_.object_pose);
+  // AddAttachedCollBox(pick_place_goal_.object_pose);
   // Wait for ros things to initialize
-  ros::WallDuration(1.0).sleep();
-  PickCube(pick_place_goal_.object_pose);
+  // ros::WallDuration(1.0).sleep();
+  // PickCube(pick_place_goal_.object_pose);
 
   // ROS_INFO_STREAM("[PICKPLACEACTION] Starting MoveIt planning ...");
   // move_group_right_arm.setPoseTarget(pick_place_goal_.object_pose,
   //                                    "r_wrist_roll_link");
-  // moveit::planning_interface::MoveGroup::Plan obj_pose_plan;
+  moveit::planning_interface::MoveGroup::Plan pregrasp_plan;
+  moveit::planning_interface::MoveGroup::Plan grasp_plan;
+  moveit::planning_interface::MoveGroup::Plan postgrasp_plan;
   // success = move_group_right_arm.plan(obj_pose_plan);
-  // ROS_INFO_STREAM("[PICKPLACEACTION] Planning finished: " <<
-  //                 ((success) ? "success" : "fail"));
 
-  // // display_trajectory.trajectory_start = obj_pose_plan.start_state_;
-  // // display_trajectory.trajectory.push_back(obj_pose_plan.trajectory_);
-  // // display_publisher.publish(display_trajectory);
-  // if (success) {
-  //   ROS_INFO_STREAM("[PICKPLACEACTION] Executing on the robot ...");
-  //   success = move_group_right_arm.execute(obj_pose_plan);
-  //   ROS_INFO_STREAM("[PICKPLACEACTION] Return success of MoveIt execution of plan: "
-  //                   << ((success) ? "success" : "fail"));
-  // } else {
-  //   ROS_INFO_STREAM("[PICKPLACEACTION] Failed to find a plan for pose: "
-  //                   << pick_place_goal_.object_pose);
-  // }
+  // display_trajectory.trajectory_start = obj_pose_plan.start_state_;
+  // display_trajectory.trajectory.push_back(obj_pose_plan.trajectory_);
+  // display_publisher.publish(display_trajectory);
+
+  geometry_msgs::Pose pregrasp_pose(pick_place_goal_.object_pose);
+  pregrasp_pose.position.z += 0.1;
+  geometry_msgs::Pose postgrasp_pose(pick_place_goal_.object_pose);
+  postgrasp_pose.position.z += 0.1;
+
+  moveit::core::RobotState pregrasp_robot_state = RobotStateFromPose(
+                                                    pregrasp_pose);
+  moveit::core::RobotState postgrasp_robot_state = RobotStateFromPose(
+                                                     postgrasp_pose);
+
+  success = Plan(*move_group_right_arm.getCurrentState(),
+                 pregrasp_robot_state,
+                 pregrasp_plan);
+  ROS_INFO_STREAM("[PICKPLACEACTION] Planning finished 'pregrasp': " <<
+                  ((success) ? "success" : "fail"));
+  success &= Plan(pregrasp_robot_state,
+                  RobotStateFromPose(pick_place_goal_.object_pose),
+                  grasp_plan);
+  ROS_INFO_STREAM("[PICKPLACEACTION] Planning finished 'grasp': " <<
+                  ((success) ? "success" : "fail"));
+  success &= Plan(RobotStateFromPose(pick_place_goal_.object_pose),
+                  postgrasp_robot_state,
+                  postgrasp_plan);
+  ROS_INFO_STREAM("[PICKPLACEACTION] Planning finished 'postgrasp': " <<
+                  ((success) ? "success" : "fail"));
+
+  if (success) {
+    ROS_INFO_STREAM("[PICKPLACEACTION] Executing on the robot ...");
+    success = move_group_right_arm.execute(pregrasp_plan);
+    ROS_INFO_STREAM("WAITING!!!");
+    ros::WallDuration(1.0).sleep();
+    if (success) {success &= move_group_right_arm.execute(grasp_plan); }
+    ros::WallDuration(1.0).sleep();
+    if (success) {success &= move_group_right_arm.execute(postgrasp_plan); }
+    ROS_INFO_STREAM("[PICKPLACEACTION] Return success of MoveIt execution of plan: "
+                    << ((success) ? "success" : "fail"));
+  } else {
+    ROS_INFO_STREAM("[PICKPLACEACTION] Failed to find a plan for pose: "
+                    << pick_place_goal_.object_pose);
+  }
 
   if (success) {
     result_.success = true;
@@ -191,13 +223,6 @@ void PickPlaceAction::AddAttachedCollBox(geometry_msgs::Pose p) {
   collision_object.operation = moveit_msgs::CollisionObject::REMOVE;
   pub_co.publish(collision_object);
 
-  // Now define a AttachedCollisionObject
-  moveit_msgs::AttachedCollisionObject aco;
-  aco.object = collision_object;
-  // aco.link_name = "r_wrist_roll_link";
-  ROS_INFO_STREAM(aco);
-  pub_aco.publish(aco);
-  ros::WallDuration(1.0).sleep();
 
   // Create the actual object
   shape_msgs::SolidPrimitive primitive;
@@ -216,6 +241,13 @@ void PickPlaceAction::AddAttachedCollBox(geometry_msgs::Pose p) {
   pub_co.publish(collision_object);
 
 
+  ros::WallDuration(1.0).sleep();
+  // Now define a AttachedCollisionObject
+  moveit_msgs::AttachedCollisionObject aco;
+  aco.object = collision_object;
+  aco.link_name = "r_wrist_roll_link";
+  ROS_INFO_STREAM("Atatchable object: " << aco);
+  pub_aco.publish(aco);
   ros::WallDuration(1.0).sleep();
 }
 
@@ -300,4 +332,47 @@ bool PickPlaceAction::PlaceCube(geometry_msgs::Pose p) {
   move_group_right_arm.setPlannerId("RRTConnectkConfigDefault");
 
   return move_group_right_arm.place("cube", loc);
+}
+
+bool PickPlaceAction::Plan(moveit::core::RobotState start,
+                           moveit::core::RobotState end,
+                           moveit::planning_interface::MoveGroup::Plan& plan,
+                           bool constrained) {
+  if (constrained) {
+    moveit_msgs::OrientationConstraint ocm;
+    ocm.link_name = "r_wrist_roll_link";
+    ocm.header.frame_id = move_group_right_arm.getPlanningFrame();
+    // Set the orientation of the final pose
+    // ocm.orientation = end.orientation;
+
+    // ocm.absolute_x_axis_tolerance = 0.1;
+    // ocm.absolute_y_axis_tolerance = 0.1;
+    // ocm.absolute_z_axis_tolerance = 0.1;
+    ocm.weight = 1.0;
+    //Set path constraint
+    moveit_msgs::Constraints test_constraints;
+    test_constraints.orientation_constraints.push_back(ocm);
+    move_group_right_arm.setPathConstraints(test_constraints);
+  }
+
+  move_group_right_arm.setStartState(start);
+  move_group_right_arm.setJointValueTarget(end);
+  bool success = move_group_right_arm.plan(plan);
+
+
+  if (constrained) {
+    // Clear path constraint
+    move_group_right_arm.clearPathConstraints();
+  }
+
+  return success;
+}
+
+moveit::core::RobotState PickPlaceAction::RobotStateFromPose(
+  geometry_msgs::Pose p) {
+  moveit::core::RobotState state(*move_group_right_arm.getCurrentState());
+  const robot_state::JointModelGroup* joint_model_group =
+    state.getJointModelGroup(move_group_right_arm.getName());
+  state.setFromIK(joint_model_group, p);
+  return state;
 }
