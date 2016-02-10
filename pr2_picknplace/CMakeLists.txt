@@ -154,13 +154,23 @@ add_executable(pr2_picknplace
   src/pr2_picknplace.cpp
   src/pick_place.cpp)
 
+add_executable(pr2_picknplace_actest
+  src/pick_place_actest.cpp)
+
 ## Add cmake target dependencies of the executable
 ## same as for the library above
 add_dependencies(pr2_picknplace
   pr2_picknplace_msgs_gencpp)
 
+add_dependencies(pr2_picknplace_actest
+  pr2_picknplace_msgs_gencpp)
+
 ## Specify libraries to link a library or executable target against
 target_link_libraries(pr2_picknplace
+  ${catkin_LIBRARIES}
+)
+
+target_link_libraries(pr2_picknplace_actest
   ${catkin_LIBRARIES}
 )
 
