@@ -31,7 +31,7 @@ PickPlaceAction::PickPlaceAction(ros::NodeHandle& nh, std::string name) :
   }
 
   if (add_table_) {
-    ros::WallDuration(1.0).sleep();
+    ros::WallDuration(wait_).sleep();
     this->AddCollisionObjs();
   }
 
@@ -51,10 +51,11 @@ void PickPlaceAction::loadParams() {
   ros::param::param(ns_ + "/max_planning_time", max_planning_time, 10.0);
   ros::param::param(ns_ + "/add_table", add_table_, true);
   ROS_INFO_STREAM("Planning time: " << max_planning_time <<
-                  "\nAdding table: " << add_table_);
+                  ", Adding table: " << (add_table_ ? "True" : "False"));
 }
 
 void PickPlaceAction::init() {
+  wait_ = 1.0f;
 }
 
 void PickPlaceAction::rosSetup() {
@@ -75,7 +76,7 @@ void PickPlaceAction::rosSetup() {
   ROS_DEBUG("[PICKPLACEACTION] Reference frame: %s",
             move_group_right_arm.getEndEffectorLink().c_str());
   // ROS_INFO_STREAM("State: " << *move_group_right_arm.getCurrentState());
-  ROS_INFO_STREAM("[PICKPLACEACTION] Current pose" <<
+  ROS_INFO_STREAM("[PICKPLACEACTION] Current " <<
                   move_group_right_arm.getCurrentPose().pose);
 }
 
@@ -173,7 +174,6 @@ void PickPlaceAction::executeCB() {
 
 }
 
-
 void PickPlaceAction::AddCollisionObjs() {
   moveit_msgs::CollisionObject collision_object;
   collision_object.header.frame_id = move_group_right_arm.getPlanningFrame();
@@ -243,7 +243,8 @@ void PickPlaceAction::AddAttachedCollBox(geometry_msgs::Pose p) {
   aco.link_name = "r_wrist_roll_link";
   ROS_INFO_STREAM("Atatchable object: " << aco);
   pub_aco.publish(aco);
-  ros::WallDuration(1.0).sleep();
+  ros::WallDuration(wait_).sleep();
+
 }
 
 bool PickPlaceAction::PickCube(geometry_msgs::Pose p) {

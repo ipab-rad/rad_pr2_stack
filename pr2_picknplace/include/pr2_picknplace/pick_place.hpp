@@ -64,6 +64,7 @@ class PickPlaceAction {
 
     // Variables
     std::string ns_;
+    float wait_;
     double max_planning_time;
     pr2_picknplace_msgs::PicknPlaceGoal pick_place_goal_;
     moveit::planning_interface::MoveGroup move_group_right_arm;
