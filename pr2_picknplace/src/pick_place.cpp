@@ -51,10 +51,12 @@ void PickPlaceAction::loadParams() {
   ros::param::param(ns_ + "/add_table", add_table_, true);
   ros::param::param(ns_ + "/open_gripper_pos", open_gripper_pos_, 0.08);
   ros::param::param(ns_ + "/close_gripper_pos", close_gripper_pos_, 0.00);
+  ros::param::param(ns_ + "/close_effort", close_effort_, 50.0);
   ROS_INFO_STREAM("Planning time: " << max_planning_time <<
                   ", Adding table: " << (add_table_ ? "True" : "False") <<
                   ", OpenGripperPos: " << open_gripper_pos_ <<
-                  ", CloseGripperPos: " << close_gripper_pos_);
+                  ", CloseGripperPos: " << close_gripper_pos_ <<
+                  ", CloseEffort: " << close_effort_);
 }
 
 void PickPlaceAction::init() {
@@ -259,9 +261,11 @@ bool PickPlaceAction::PickCube(geometry_msgs::Pose p) {
     if (success) { success &= move_group_right_arm.execute(grasp_plan); }
     ros::WallDuration(exec_wait_).sleep();
 
-    SendGripperCommand(close_gripper_pos_, 50.0);
+    SendGripperCommand(close_gripper_pos_, close_effort_);
 
     if (success) { success &= CheckGripperFinished(); }
+
+    ros::WallDuration(0.1).sleep();
 
     if (success) { success &= move_group_right_arm.execute(postgrasp_plan); }
     ROS_INFO_STREAM("[PICKPLACEACTION] MoveIt execution of plan: "

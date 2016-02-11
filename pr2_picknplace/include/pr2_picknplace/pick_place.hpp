@@ -81,6 +81,7 @@ class PickPlaceAction {
     double max_planning_time;
     double open_gripper_pos_;
     double close_gripper_pos_;
+    double close_effort_;
 
     // Constants
     // const float CLOSE_GRIPPER_POS = 0.00f;
