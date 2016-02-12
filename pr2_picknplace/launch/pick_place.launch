@@ -1,6 +1,7 @@
 <?xml version="1.0"?>
 
 <launch>
+        <node pkg="tf" type="static_transform_publisher" name="table_pr2_static_tf" args="1 0 0.73 0 0 0.707 -0.707 /odom_combined /tabletop 100" />
         <group ns="pick_place">
                 <rosparam file="$(find pr2_picknplace)/cfg/picknplace_config.yaml" command="load" />
         </group>

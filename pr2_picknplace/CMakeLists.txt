@@ -7,6 +7,9 @@ project(pr2_picknplace)
 find_package(catkin REQUIRED COMPONENTS
   pr2_picknplace_msgs
   actionlib
+  tf2_ros
+  tf2_geometry_msgs
+  tf2_eigen
   geometry_msgs
   move_base_msgs
   moveit_msgs

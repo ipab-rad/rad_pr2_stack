@@ -11,9 +11,12 @@
 
 // System
 #include <string>
+#include <Eigen/Geometry>
 
 // ROS
 #include <ros/ros.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 #include <actionlib/server/simple_action_server.h>
 #include <actionlib/client/simple_action_client.h>
 #include <geometric_shapes/solid_primitive_dims.h>
@@ -62,16 +65,18 @@ class PickPlaceAction {
     // Methods
     void AddCollisionObjs();
     void AddAttachedCollBox(geometry_msgs::Pose p);
-    bool PickCube(geometry_msgs::Pose p);
-    bool PlaceCube(geometry_msgs::Pose p);
+    bool PickCube(geometry_msgs::PoseStamped ps);
+    bool PlaceCube(geometry_msgs::PoseStamped ps);
 
     bool Plan(moveit::core::RobotState start, moveit::core::RobotState end,
               moveit::planning_interface::MoveGroup::Plan& plan,
-              geometry_msgs::Quaternion orient_constraint = geometry_msgs::Quaternion());
+              geometry_msgs::Quaternion orient_constraint =
+                  geometry_msgs::Quaternion());
     moveit::core::RobotState RobotStateFromPose(geometry_msgs::Pose p);
 
     void SendGripperCommand(float position, float max_effort = -1.0f);
     bool CheckGripperFinished();
+    moveit_msgs::CollisionObject deleteObject(std::string object_id);
 
     // Flags
 
@@ -88,6 +93,9 @@ class PickPlaceAction {
     float exec_wait_;
     pr2_picknplace_msgs::PicknPlaceGoal pick_place_goal_;
     moveit::planning_interface::MoveGroup move_group_right_arm;
+    tf2_ros::Buffer tfBuffer;
+    tf2_ros::TransformListener tfListener;
+
     ros::Publisher pub_co;
     ros::Publisher pub_aco;
     actionlib::SimpleActionClient

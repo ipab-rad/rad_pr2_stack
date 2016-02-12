@@ -7,13 +7,15 @@
  */
 
 #include "pr2_picknplace/pick_place.hpp"
+#include <tf2_eigen/tf2_eigen.h>
 
 PickPlaceAction::PickPlaceAction(ros::NodeHandle& nh, std::string name) :
   nh_(nh),
   as_(nh_, name, false),
   action_name_(name),
-  move_group_right_arm("right_arm") {
-  // Register the goal and feeback callbacks
+  move_group_right_arm("right_arm"),
+  tfListener(tfBuffer) {
+  // Register the goal and feedback callbacks
   as_.registerGoalCallback(boost::bind(&PickPlaceAction::goalCB, this));
   as_.registerPreemptCallback(boost::bind(&PickPlaceAction::preemptCB, this));
 
@@ -39,6 +41,8 @@ PickPlaceAction::PickPlaceAction(ros::NodeHandle& nh, std::string name) :
 }
 
 PickPlaceAction::~PickPlaceAction() {
+  deleteObject("cube");
+  deleteObject("table_top");
   ros::param::del(ns_);
 }
 
@@ -60,7 +64,7 @@ void PickPlaceAction::loadParams() {
 }
 
 void PickPlaceAction::init() {
-  co_wait_ = 1.0f;
+  co_wait_ = 0.5f;
   exec_wait_ = 0.0f;
 }
 
@@ -89,10 +93,13 @@ void PickPlaceAction::rosSetup() {
   actionlib::SimpleActionClient<pr2_controllers_msgs::Pr2GripperCommandAction>(
     "r_gripper_controller/gripper_action", true);
 
-  //wait for the gripper action server to come up
+  // Wait for the gripper action server to come up
   while (!gripper_client_->waitForServer(ros::Duration(5.0))) {
-    ROS_INFO("Waiting for the r_gripper_controller/gripper_action action server to come up");
+    ROS_INFO("Waiting for the gripper action server to come up");
   }
+
+  deleteObject("cube");
+  deleteObject("table_top");
 }
 
 void PickPlaceAction::goalCB() {
@@ -105,31 +112,34 @@ void PickPlaceAction::goalCB() {
 
 void PickPlaceAction::preemptCB() {
   // Received preempt request to stop
-  // going = false;
   as_.setPreempted();
 }
 
 void PickPlaceAction::executeCB() {
   ROS_INFO("[PICKPLACEACTION] Executing goal for %s", action_name_.c_str());
-  // bool going = true;
   bool success = true;
 
   if (as_.isPreemptRequested() || !ros::ok()) {
     ROS_INFO("[PICKPLACEACTION] %s: Preempted", action_name_.c_str());
     as_.setPreempted();
     success = false;
-    // going = false;
   }
 
   // Call the MoveIt planning
   // AddAttachedCollBox(pick_place_goal_.object_pose);
   // Wait for ros things to initialize
+  geometry_msgs::PoseStamped ps;
+  ps.header.frame_id = pick_place_goal_.header.frame_id;
+  ps.header.stamp = ros::Time::now();
+  ps.pose = pick_place_goal_.object_pose;
+  ps.pose.position.z += 0.015;  // Temporary fix until better transformation
+
   switch (pick_place_goal_.request) {
   case picknplace::REQUEST_PICK:
-    PickCube(pick_place_goal_.object_pose);
+    PickCube(ps);
     break;
   case picknplace::REQUEST_PLACE:
-    PlaceCube(pick_place_goal_.object_pose);
+    PlaceCube(ps);
     break;
   case picknplace::REQUEST_MOVE:
     ROS_WARN("Move Request not implemented yet.");
@@ -148,30 +158,23 @@ void PickPlaceAction::executeCB() {
 }
 
 void PickPlaceAction::AddCollisionObjs() {
-  moveit_msgs::CollisionObject collision_object;
-  collision_object.header.frame_id = move_group_right_arm.getPlanningFrame();
-  collision_object.header.stamp = ros::Time::now();
-
-  // The id of the object is used to identify it.
-  collision_object.id = "table_top";
-  // Remove any previous occurances in the world
-  collision_object.operation = moveit_msgs::CollisionObject::REMOVE;
-  pub_co.publish(collision_object);
+  moveit_msgs::CollisionObject collision_object = deleteObject("table_top");
 
   // Define a box to add to the world.
   shape_msgs::SolidPrimitive primitive;
   primitive.type = primitive.CYLINDER;
   primitive.dimensions.resize(
-    geometric_shapes::SolidPrimitiveDimCount<shape_msgs::SolidPrimitive::CYLINDER>::value);
+    geometric_shapes::SolidPrimitiveDimCount
+    <shape_msgs::SolidPrimitive::CYLINDER>::value);
   primitive.dimensions[shape_msgs::SolidPrimitive::CYLINDER_HEIGHT] = 0.0254;
   primitive.dimensions[shape_msgs::SolidPrimitive::CYLINDER_RADIUS] = 0.6;
 
   // A pose for the box (specified relative to frame_id)
   geometry_msgs::Pose table_top_pose;
   table_top_pose.orientation.w = 1.0;
-  table_top_pose.position.x =  0.8;
-  table_top_pose.position.y =  -0.50;
-  table_top_pose.position.z =  0.7;
+  table_top_pose.position.x =  1.0;
+  table_top_pose.position.y =  0.0;
+  table_top_pose.position.z =  0.72;
 
   collision_object.primitives.push_back(primitive);
   collision_object.primitive_poses.push_back(table_top_pose);
@@ -185,19 +188,14 @@ void PickPlaceAction::AddCollisionObjs() {
 }
 
 void PickPlaceAction::AddAttachedCollBox(geometry_msgs::Pose p) {
-  moveit_msgs::CollisionObject collision_object;
-  collision_object.header.frame_id = move_group_right_arm.getPlanningFrame();
-  collision_object.header.stamp = ros::Time::now();
-  collision_object.id = "cube";
-  // Remove any previous occurances in the world
-  collision_object.operation = moveit_msgs::CollisionObject::REMOVE;
-  pub_co.publish(collision_object);
+  moveit_msgs::CollisionObject collision_object = deleteObject("cube");
 
   // Create the actual object
   shape_msgs::SolidPrimitive primitive;
   primitive.type = primitive.BOX;
   primitive.dimensions.resize(
-    geometric_shapes::SolidPrimitiveDimCount<shape_msgs::SolidPrimitive::BOX>::value);
+    geometric_shapes::SolidPrimitiveDimCount
+    <shape_msgs::SolidPrimitive::BOX>::value);
   primitive.dimensions[shape_msgs::SolidPrimitive::BOX_X] = 0.0254;
   primitive.dimensions[shape_msgs::SolidPrimitive::BOX_Y] = 0.0254;
   primitive.dimensions[shape_msgs::SolidPrimitive::BOX_Z] = 0.0254;
@@ -219,16 +217,73 @@ void PickPlaceAction::AddAttachedCollBox(geometry_msgs::Pose p) {
   ros::WallDuration(co_wait_).sleep();
 }
 
-bool PickPlaceAction::PickCube(geometry_msgs::Pose p) {
+bool PickPlaceAction::PickCube(geometry_msgs::PoseStamped ps) {
   ROS_INFO_STREAM("[PICKPLACEACTION] Starting Pick planning ...");
   moveit::planning_interface::MoveGroup::Plan pregrasp_plan;
   moveit::planning_interface::MoveGroup::Plan grasp_plan;
   moveit::planning_interface::MoveGroup::Plan postgrasp_plan;
 
+  std::string pr2_frame = move_group_right_arm.getPlanningFrame();
+  pr2_frame.erase(0, 1);
+
+  geometry_msgs::TransformStamped transform;
+  try {
+    Eigen::Translation3d t0;
+    t0 = Eigen::Translation3d(ps.pose.position.x,
+                              ps.pose.position.y,
+                              ps.pose.position.z);
+
+    // Tabletop to OdomCombined transformation
+    Eigen::Affine3d t1 =
+      tf2::transformToEigen(tfBuffer.lookupTransform(pr2_frame,
+                                                     ps.header.frame_id,
+                                                     ros::Time(0)));
+    // Rotate Gripper 90 deg in Y axis
+    Eigen::Affine3d t2;
+    t2 = Eigen::AngleAxisd(0.5 * M_PI,  Eigen::Vector3d::UnitY());
+
+    // ToolFrame to WristFrame transformation
+    Eigen::Affine3d t3 =
+      tf2::transformToEigen(tfBuffer.lookupTransform("r_wrist_roll_link",
+                                                     "r_gripper_tool_frame",
+                                                     ros::Time(0)));
+
+    Eigen::Affine3d t = t1 * t0 * t2 * t0.inverse();
+
+    ROS_INFO_STREAM("T3:\n" << t3.matrix());
+
+    transform.transform.translation.x = t.translation().x();
+    transform.transform.translation.y = t.translation().y();
+    transform.transform.translation.z = t.translation().z();
+
+    Eigen::Quaterniond q(t.rotation());
+    transform.transform.rotation.x = q.x();
+    transform.transform.rotation.y = q.y();
+    transform.transform.rotation.z = q.z();
+    transform.transform.rotation.w = q.w();
+  } catch (tf2::TransformException& ex) {
+    ROS_ERROR("%s", ex.what());
+  }
+
+  geometry_msgs::PoseStamped pso;
+  try { tf2::doTransform(ps, pso, transform); }
+  catch (tf2::TransformException ex) {
+    ROS_ERROR("%s", ex.what());
+    return false;
+  }
+  geometry_msgs::Pose p = pso.pose;
+
+  ROS_DEBUG_STREAM("Input " << ps);
+  ROS_DEBUG_STREAM("Output " << pso);
+
   geometry_msgs::Pose pregrasp_pose(p);
   pregrasp_pose.position.z += 0.1;
   geometry_msgs::Pose postgrasp_pose(p);
   postgrasp_pose.position.z += 0.1;
+
+  ROS_DEBUG_STREAM("Pregrasp " << pregrasp_pose);
+  ROS_DEBUG_STREAM("Grasp " << p);
+  ROS_DEBUG_STREAM("Postgrasp " << postgrasp_pose);
 
   moveit::core::RobotState pregrasp_robot_state = RobotStateFromPose(
                                                     pregrasp_pose);
@@ -242,7 +297,7 @@ bool PickPlaceAction::PickCube(geometry_msgs::Pose p) {
   ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'pregrasp': " <<
                   ((success) ? "success" : "fail"));
   success &= Plan(pregrasp_robot_state, grasp_robot_state,
-                  grasp_plan, p.orientation);
+                  grasp_plan);
   ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'grasp': " <<
                   ((success) ? "success" : "fail"));
   success &= Plan(grasp_robot_state, postgrasp_robot_state, postgrasp_plan);
@@ -265,7 +320,7 @@ bool PickPlaceAction::PickCube(geometry_msgs::Pose p) {
 
     if (success) { success &= CheckGripperFinished(); }
 
-    ros::WallDuration(0.1).sleep();
+    ros::WallDuration(0.1).sleep();  // Gripper delay for better grippage
 
     if (success) { success &= move_group_right_arm.execute(postgrasp_plan); }
     ROS_INFO_STREAM("[PICKPLACEACTION] MoveIt execution of plan: "
@@ -277,16 +332,73 @@ bool PickPlaceAction::PickCube(geometry_msgs::Pose p) {
   return success;
 }
 
-bool PickPlaceAction::PlaceCube(geometry_msgs::Pose p) {
+bool PickPlaceAction::PlaceCube(geometry_msgs::PoseStamped ps) {
   ROS_INFO_STREAM("[PICKPLACEACTION] Starting Place planning ...");
   moveit::planning_interface::MoveGroup::Plan preplace_plan;
   moveit::planning_interface::MoveGroup::Plan place_plan;
   moveit::planning_interface::MoveGroup::Plan postplace_plan;
 
+  std::string pr2_frame = move_group_right_arm.getPlanningFrame();
+  pr2_frame.erase(0, 1);
+
+  geometry_msgs::TransformStamped transform;
+  try {
+    Eigen::Translation3d t0;
+    t0 = Eigen::Translation3d(ps.pose.position.x,
+                              ps.pose.position.y,
+                              ps.pose.position.z);
+
+    // Tabletop to OdomCombined transformation
+    Eigen::Affine3d t1 =
+      tf2::transformToEigen(tfBuffer.lookupTransform(pr2_frame,
+                                                     ps.header.frame_id,
+                                                     ros::Time(0)));
+    // Rotate Gripper 90 deg in Y axis
+    Eigen::Affine3d t2;
+    t2 = Eigen::AngleAxisd(0.5 * M_PI,  Eigen::Vector3d::UnitY());
+
+    // ToolFrame to WristFrame transformation
+    Eigen::Affine3d t3 =
+      tf2::transformToEigen(tfBuffer.lookupTransform("r_wrist_roll_link",
+                                                     "r_gripper_tool_frame",
+                                                     ros::Time(0)));
+
+    Eigen::Affine3d t = t1 * t0 * t2 * t0.inverse();
+
+    ROS_INFO_STREAM("T3:\n" << t3.matrix());
+
+    transform.transform.translation.x = t.translation().x();
+    transform.transform.translation.y = t.translation().y();
+    transform.transform.translation.z = t.translation().z();
+
+    Eigen::Quaterniond q(t.rotation());
+    transform.transform.rotation.x = q.x();
+    transform.transform.rotation.y = q.y();
+    transform.transform.rotation.z = q.z();
+    transform.transform.rotation.w = q.w();
+  } catch (tf2::TransformException& ex) {
+    ROS_ERROR("%s", ex.what());
+  }
+
+  geometry_msgs::PoseStamped pso;
+  try { tf2::doTransform(ps, pso, transform); }
+  catch (tf2::TransformException ex) {
+    ROS_ERROR("%s", ex.what());
+    return false;
+  }
+  geometry_msgs::Pose p = pso.pose;
+
+  ROS_DEBUG_STREAM("Input " << ps);
+  ROS_DEBUG_STREAM("Output " << pso);
+
   geometry_msgs::Pose preplace_pose(p);
   preplace_pose.position.z += 0.1;
   geometry_msgs::Pose postplace_pose(p);
   postplace_pose.position.z += 0.1;
+
+  ROS_DEBUG_STREAM("Preplace " << preplace_pose);
+  ROS_DEBUG_STREAM("Place " << p);
+  ROS_DEBUG_STREAM("Postplace " << postplace_pose);
 
   moveit::core::RobotState preplace_robot_state = RobotStateFromPose(
                                                     preplace_pose);
@@ -299,8 +411,7 @@ bool PickPlaceAction::PlaceCube(geometry_msgs::Pose p) {
                       preplace_plan);
   ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'preplace': " <<
                   ((success) ? "success" : "fail"));
-  success &= Plan(preplace_robot_state, place_robot_state,
-                  place_plan, p.orientation);
+  success &= Plan(preplace_robot_state, place_robot_state, place_plan);
   ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'place': " <<
                   ((success) ? "success" : "fail"));
   success &= Plan(place_robot_state, postplace_robot_state, postplace_plan);
@@ -342,7 +453,7 @@ bool PickPlaceAction::Plan(moveit::core::RobotState start,
     ocm.orientation = orient_constraint;
 
     ocm.weight = 1.0;
-    //Set path constraint
+    // Set path constraint
     moveit_msgs::Constraints test_constraints;
     test_constraints.orientation_constraints.push_back(ocm);
     move_group_right_arm.setPathConstraints(test_constraints);
@@ -366,8 +477,7 @@ moveit::core::RobotState PickPlaceAction::RobotStateFromPose(
   moveit::core::RobotState state(*move_group_right_arm.getCurrentState());
   const robot_state::JointModelGroup* joint_model_group =
     state.getJointModelGroup(move_group_right_arm.getName());
-  state.setFromIK(joint_model_group, p,
-                  "r_gripper_tool_frame"); // "r_wrist_roll_link"
+  state.setFromIK(joint_model_group, p, "r_gripper_tool_frame");
   return state;
 }
 
@@ -388,4 +498,17 @@ bool PickPlaceAction::CheckGripperFinished() {
     ROS_WARN("[PICKPLACEACTION] The gripper failed to open.");
     return false;
   }
+}
+
+moveit_msgs::CollisionObject PickPlaceAction::deleteObject(
+  std::string object_id) {
+  moveit_msgs::CollisionObject collision_object;
+  collision_object.header.frame_id = move_group_right_arm.getPlanningFrame();
+  collision_object.header.stamp = ros::Time::now();
+  collision_object.id = object_id;
+  // Remove any previous occurrences in the world
+  collision_object.operation = moveit_msgs::CollisionObject::REMOVE;
+  pub_co.publish(collision_object);
+  // ros::WallDuration(co_wait_).sleep();
+  return collision_object;
 }
