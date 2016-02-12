@@ -1,6 +1,6 @@
 /**
  * @file      pick_place.hpp
- * @brief     Add file description...
+ * @brief     Provides basic pick and place API through an Action Server
  * @author    Alejandro Bordallo <alex.bordallo@ed.ac.uk>
  * @date      2016-02-06
  * @copyright (MIT) 2015 RAD-UoE Informatics
@@ -74,7 +74,6 @@ class PickPlaceAction {
     bool CheckGripperFinished();
 
     // Flags
-    // bool going;
 
     // Parameters
     bool add_table_;
@@ -82,11 +81,6 @@ class PickPlaceAction {
     double open_gripper_pos_;
     double close_gripper_pos_;
     double close_effort_;
-
-    // Constants
-    // const float CLOSE_GRIPPER_POS = 0.00f;
-    // const float OPEN_GRIPPER_POS = 0.08f;
-    // const float CUBE_GRIPPER_POS = 0.025f;
 
     // Variables
     std::string ns_;
@@ -96,8 +90,8 @@ class PickPlaceAction {
     moveit::planning_interface::MoveGroup move_group_right_arm;
     ros::Publisher pub_co;
     ros::Publisher pub_aco;
-    actionlib::SimpleActionClient<pr2_controllers_msgs::Pr2GripperCommandAction>*
-    gripper_client_;
+    actionlib::SimpleActionClient
+    <pr2_controllers_msgs::Pr2GripperCommandAction>* gripper_client_;
 };
 
 namespace picknplace {

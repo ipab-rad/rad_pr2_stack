@@ -1,6 +1,6 @@
 /**
  * @file      pick_place.cpp
- * @brief     Add file description...
+ * @brief     Provides basic pick and place API through an Action Server
  * @author    Alejandro Bordallo <alex.bordallo@ed.ac.uk>
  * @date      2016-02-06
  * @copyright (MIT) 2015 RAD-UoE Informatics
@@ -45,7 +45,7 @@ PickPlaceAction::~PickPlaceAction() {
 void PickPlaceAction::loadParams() {
   ROS_INFO("[PICKPLACEACTION] Loading parameters.");
   if (!nh_.getParam(ns_ + "/max_planning_time", max_planning_time)) {
-    ROS_WARN("[PICKPLACEACTION] WARNING: Parameters were not loaded! Using default.");
+    ROS_WARN("[PICKPLACEACTION] Parameters were not loaded! Using default.");
   }
   ros::param::param(ns_ + "/max_planning_time", max_planning_time, 10.0);
   ros::param::param(ns_ + "/add_table", add_table_, true);
@@ -72,7 +72,7 @@ void PickPlaceAction::rosSetup() {
   //   node_handle.advertise<moveit_msgs::DisplayTrajectory>(
   //     "/move_group/display_planned_path", 1, true);
 
-  move_group_right_arm.setPlanningTime(max_planning_time); //seconds
+  move_group_right_arm.setPlanningTime(max_planning_time);  // Seconds
 
   // Name of the reference frame for this robot.
   ROS_DEBUG("[PICKPLACEACTION] Reference frame: %s",

@@ -1,6 +1,6 @@
 /**
  * @file      pr2_picknplace.cpp
- * @brief     Add file description...
+ * @brief     Launches pick place action server
  * @author    Alejandro Bordallo <alex.bordallo@ed.ac.uk>
  * @date      2016-02-06
  * @copyright (MIT) 2015 RAD-UoE Informatics

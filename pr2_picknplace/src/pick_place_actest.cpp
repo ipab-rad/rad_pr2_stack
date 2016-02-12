@@ -60,14 +60,16 @@ int main(int argc, char** argv) {
     pick.goal.object_pose.position.z -= height;
 
     ac.waitForResult(ros::Duration(10.0));
-    if (ac.getState() != actionlib::SimpleClientGoalState::SUCCEEDED) {return 1;}
+    if (ac.getState() != actionlib::SimpleClientGoalState::SUCCEEDED)
+    {return 1;}
 
     ac.sendGoal(place);
     // ROS_INFO_STREAM("PlaceHeight: " << place.goal.object_pose.position.z);
     place.goal.object_pose.position.z += height;
 
     ac.waitForResult(ros::Duration(10.0));
-    if (ac.getState() != actionlib::SimpleClientGoalState::SUCCEEDED) {return 1;}
+    if (ac.getState() != actionlib::SimpleClientGoalState::SUCCEEDED)
+    {return 1;}
   }
 
   ros::shutdown();

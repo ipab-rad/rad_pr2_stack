@@ -1,5 +1,5 @@
 add_table: true
 max_planning_time: 10.0
-open_gripper_pos: 0.04
+open_gripper_pos: 0.05
 close_gripper_pos: 0.025
 close_effort: 50.0
