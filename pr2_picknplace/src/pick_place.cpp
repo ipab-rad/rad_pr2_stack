@@ -366,7 +366,8 @@ moveit::core::RobotState PickPlaceAction::RobotStateFromPose(
   moveit::core::RobotState state(*move_group_right_arm.getCurrentState());
   const robot_state::JointModelGroup* joint_model_group =
     state.getJointModelGroup(move_group_right_arm.getName());
-  state.setFromIK(joint_model_group, p);
+  state.setFromIK(joint_model_group, p,
+                  "r_gripper_tool_frame"); // "r_wrist_roll_link"
   return state;
 }
 
