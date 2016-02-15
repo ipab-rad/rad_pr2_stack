@@ -10,6 +10,9 @@
 
   <buildtool_depend>catkin</buildtool_depend>
   <build_depend>actionlib</build_depend>
+  <build_depend>tf2_ros</build_depend>
+  <build_depend>tf2_geometry_msgs</build_depend>
+  <build_depend>tf2_eigen</build_depend>
   <build_depend>move_base_msgs</build_depend>
   <build_depend>moveit_msgs</build_depend>
   <build_depend>pr2_picknplace_msgs</build_depend>
@@ -20,6 +23,9 @@
   <build_depend>moveit_ros_perception</build_depend>
 
   <run_depend>actionlib</run_depend>
+  <run_depend>tf2_ros</run_depend>
+  <run_depend>tf2_geometry_msgs</run_depend>
+  <run_depend>tf2_eigen</run_depend>
   <run_depend>move_base_msgs</run_depend>
   <run_depend>moveit_msgs</run_depend>
   <run_depend>pr2_picknplace_msgs</run_depend>
