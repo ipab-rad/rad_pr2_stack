@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+
+<launch>
+    <arg name="camera_namespace" default="/prosilica_camera_tag" />
+
+    <node name="pr2_localise_table" pkg="pr2_picknplace" type="pr2_localise_table" output="screen" clear_params="true">
+        <param name="camera_ns" type="str" value="$(arg camera_namespace)" />
+    </node>
+
+    <node name="apriltag_detector" pkg="apriltags_ros" type="apriltag_detector_node" output="screen" ns="pr2_cam">
+        <remap from="image_rect" to="$(arg camera_namespace)/image_raw"/>
+        <remap from="camera_info" to="$(arg camera_namespace)/camera_info"/>
+        <param name="image_transport" type="str" value="compressed" />
+        <param name="tf_frame" value="high_def_frame"/>
+        <rosparam param="tag_descriptions">[
+            {id: 39, size: 0.14, frame_id: tag_39},
+            {id: 11, size: 0.14, frame_id: tag_11}]
+        </rosparam>
+    </node>
+</launch>

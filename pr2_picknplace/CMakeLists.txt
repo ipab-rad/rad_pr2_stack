@@ -160,6 +160,9 @@ add_executable(pr2_picknplace
 add_executable(pr2_picknplace_actest
   src/pick_place_actest.cpp)
 
+add_executable(pr2_localise_table
+  src/pr2_localise_table.cpp)
+
 ## Add cmake target dependencies of the executable
 ## same as for the library above
 add_dependencies(pr2_picknplace
@@ -174,6 +177,10 @@ target_link_libraries(pr2_picknplace
 )
 
 target_link_libraries(pr2_picknplace_actest
+  ${catkin_LIBRARIES}
+)
+
+target_link_libraries(pr2_localise_table
   ${catkin_LIBRARIES}
 )
 

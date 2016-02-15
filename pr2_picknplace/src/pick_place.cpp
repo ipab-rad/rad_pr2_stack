@@ -146,15 +146,15 @@ void PickPlaceAction::executeCB() {
   ps.pose.position.z += 0.015;  // Temporary fix until better transformation
 
   switch (pick_place_goal_.request) {
-  case picknplace::REQUEST_PICK:
-    PickCube(ps);
-    break;
-  case picknplace::REQUEST_PLACE:
-    PlaceCube(ps);
-    break;
-  case picknplace::REQUEST_MOVE:
-    ROS_WARN("Move Request not implemented yet.");
-    break;
+    case picknplace::REQUEST_PICK:
+      PickCube(ps);
+      break;
+    case picknplace::REQUEST_PLACE:
+      PlaceCube(ps);
+      break;
+    case picknplace::REQUEST_MOVE:
+      ROS_WARN("Move Request not implemented yet.");
+      break;
   }
 
   if (success) {
