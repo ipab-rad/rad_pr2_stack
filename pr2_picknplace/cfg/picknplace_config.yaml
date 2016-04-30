@@ -1,3 +1,4 @@
+arm: left_arm
 add_table: true
 max_planning_time: 10.0
 open_gripper_pos: 0.05

@@ -15,7 +15,13 @@ int main(int argc, char** argv) {
   ros::NodeHandle nh("~");
   ros::AsyncSpinner spinner(2);
   spinner.start();
-  PickPlaceAction pick_place(nh, "pick_place");
+
+  std::string arm;
+  if (!ros::param::get("arm", arm)) {
+    ROS_WARN("[PICKPLACE] Arm was not chosen! Using left as default");
+    arm = "left_arm";
+  }
+  PickPlaceAction pick_place(nh, "pick_place", arm);
 
   ros::Rate r(10);
 

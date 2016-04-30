@@ -47,7 +47,7 @@ class PickPlaceAction {
     pr2_picknplace_msgs::PickPlaceResult result_;
 
   public:
-    PickPlaceAction(ros::NodeHandle& nh, std::string name);
+    PickPlaceAction(ros::NodeHandle& nh, std::string name, std::string arm);
 
     ~PickPlaceAction(void);
 
@@ -81,6 +81,9 @@ class PickPlaceAction {
     // Flags
 
     // Parameters
+    std::string wrist_roll_link;
+    std::string gripper_controller;
+    std::string gripper_tool_frame;
     bool add_table_;
     double max_planning_time;
     double open_gripper_pos_;
@@ -92,7 +95,7 @@ class PickPlaceAction {
     float co_wait_;
     float exec_wait_;
     pr2_picknplace_msgs::PicknPlaceGoal pick_place_goal_;
-    moveit::planning_interface::MoveGroup move_group_right_arm;
+    moveit::planning_interface::MoveGroup move_group_arm;
     tf2_ros::Buffer tfBuffer;
     tf2_ros::TransformListener tfListener;
 

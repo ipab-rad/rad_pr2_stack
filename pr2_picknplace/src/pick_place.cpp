@@ -9,11 +9,12 @@
 #include "pr2_picknplace/pick_place.hpp"
 #include <tf2_eigen/tf2_eigen.h>
 
-PickPlaceAction::PickPlaceAction(ros::NodeHandle& nh, std::string name) :
+PickPlaceAction::PickPlaceAction(ros::NodeHandle& nh, std::string name,
+                                 std::string arm) :
   nh_(nh),
   as_(nh_, name, false),
   action_name_(name),
-  move_group_right_arm("right_arm"),
+  move_group_arm(arm),
   tfListener(tfBuffer) {
   // Register the goal and feedback callbacks
   as_.registerGoalCallback(boost::bind(&PickPlaceAction::goalCB, this));
@@ -21,12 +22,22 @@ PickPlaceAction::PickPlaceAction(ros::NodeHandle& nh, std::string name) :
 
   ns_ = ros::this_node::getNamespace() + name;
 
+  if (arm == "right_arm") {
+    wrist_roll_link = "r_wrist_roll_link";
+    gripper_controller = "r_gripper_controller/gripper_action";
+    gripper_tool_frame = "r_gripper_tool_frame";
+  } else {
+    wrist_roll_link = "l_wrist_roll_link";
+    gripper_controller = "l_gripper_controller/gripper_action";
+    gripper_tool_frame = "l_gripper_tool_frame";
+  }
+
   this->loadParams();
   this->init();
   this->rosSetup();
 
 
-  std::vector<std::string> js = move_group_right_arm.getJoints();
+  std::vector<std::string> js = move_group_arm.getJoints();
   for (size_t i = 0; i < js.size(); ++i) {
     ROS_INFO_STREAM(js[i]);
   }
@@ -76,22 +87,22 @@ void PickPlaceAction::rosSetup() {
   //   node_handle.advertise<moveit_msgs::DisplayTrajectory>(
   //     "/move_group/display_planned_path", 1, true);
 
-  move_group_right_arm.setPlanningTime(max_planning_time);  // Seconds
+  move_group_arm.setPlanningTime(max_planning_time);  // Seconds
 
   // Name of the reference frame for this robot.
   ROS_DEBUG("[PICKPLACEACTION] Reference frame: %s",
-            move_group_right_arm.getPlanningFrame().c_str());
+            move_group_arm.getPlanningFrame().c_str());
 
   // Name of the end-effector link for this group.
   ROS_DEBUG("[PICKPLACEACTION] Reference frame: %s",
-            move_group_right_arm.getEndEffectorLink().c_str());
-  // ROS_INFO_STREAM("State: " << *move_group_right_arm.getCurrentState());
+            move_group_arm.getEndEffectorLink().c_str());
+  // ROS_INFO_STREAM("State: " << *move_group_arm.getCurrentState());
   ROS_INFO_STREAM("[PICKPLACEACTION] Current " <<
-                  move_group_right_arm.getCurrentPose().pose);
+                  move_group_arm.getCurrentPose().pose);
 
   gripper_client_ = new
   actionlib::SimpleActionClient<pr2_controllers_msgs::Pr2GripperCommandAction>(
-    "r_gripper_controller/gripper_action", true);
+    gripper_controller, true);
 
   // Wait for the gripper action server to come up
   while (!gripper_client_->waitForServer(ros::Duration(5.0))) {
@@ -211,7 +222,7 @@ void PickPlaceAction::AddAttachedCollBox(geometry_msgs::Pose p) {
   // Now define a AttachedCollisionObject
   moveit_msgs::AttachedCollisionObject aco;
   aco.object = collision_object;
-  aco.link_name = "r_wrist_roll_link";
+  aco.link_name = wrist_roll_link;
   ROS_INFO_STREAM("Atatchable object: " << aco);
   pub_aco.publish(aco);
   ros::WallDuration(co_wait_).sleep();
@@ -223,8 +234,9 @@ bool PickPlaceAction::PickCube(geometry_msgs::PoseStamped ps) {
   moveit::planning_interface::MoveGroup::Plan grasp_plan;
   moveit::planning_interface::MoveGroup::Plan postgrasp_plan;
 
-  std::string pr2_frame = move_group_right_arm.getPlanningFrame();
+  std::string pr2_frame = move_group_arm.getPlanningFrame();
   pr2_frame.erase(0, 1);
+  // ROS_INFO_STREAM("PR2 planning frame " << pr2_frame.c_str());
 
   geometry_msgs::TransformStamped transform;
   try {
@@ -244,8 +256,8 @@ bool PickPlaceAction::PickCube(geometry_msgs::PoseStamped ps) {
 
     // ToolFrame to WristFrame transformation
     Eigen::Affine3d t3 =
-      tf2::transformToEigen(tfBuffer.lookupTransform("r_wrist_roll_link",
-                                                     "r_gripper_tool_frame",
+      tf2::transformToEigen(tfBuffer.lookupTransform(wrist_roll_link,
+                                                     gripper_tool_frame,
                                                      ros::Time(0)));
 
     Eigen::Affine3d t = t1 * t0 * t2 * t0.inverse();
@@ -291,7 +303,7 @@ bool PickPlaceAction::PickCube(geometry_msgs::PoseStamped ps) {
   moveit::core::RobotState postgrasp_robot_state = RobotStateFromPose(
                                                      postgrasp_pose);
 
-  bool success = Plan(*move_group_right_arm.getCurrentState(),
+  bool success = Plan(*move_group_arm.getCurrentState(),
                       pregrasp_robot_state,
                       pregrasp_plan);
   ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'pregrasp': " <<
@@ -308,12 +320,12 @@ bool PickPlaceAction::PickCube(geometry_msgs::PoseStamped ps) {
     ROS_INFO_STREAM("[PICKPLACEACTION] Executing on the robot ...");
     SendGripperCommand(open_gripper_pos_);
 
-    success = move_group_right_arm.execute(pregrasp_plan);
+    success = move_group_arm.execute(pregrasp_plan);
     ros::WallDuration(exec_wait_).sleep();
 
     if (success) { success &= CheckGripperFinished();}
 
-    if (success) { success &= move_group_right_arm.execute(grasp_plan); }
+    if (success) { success &= move_group_arm.execute(grasp_plan); }
     ros::WallDuration(exec_wait_).sleep();
 
     SendGripperCommand(close_gripper_pos_, close_effort_);
@@ -322,7 +334,7 @@ bool PickPlaceAction::PickCube(geometry_msgs::PoseStamped ps) {
 
     ros::WallDuration(0.1).sleep();  // Gripper delay for better grippage
 
-    if (success) { success &= move_group_right_arm.execute(postgrasp_plan); }
+    if (success) { success &= move_group_arm.execute(postgrasp_plan); }
     ROS_INFO_STREAM("[PICKPLACEACTION] MoveIt execution of plan: "
                     << ((success) ? "success" : "fail"));
   } else {
@@ -338,7 +350,7 @@ bool PickPlaceAction::PlaceCube(geometry_msgs::PoseStamped ps) {
   moveit::planning_interface::MoveGroup::Plan place_plan;
   moveit::planning_interface::MoveGroup::Plan postplace_plan;
 
-  std::string pr2_frame = move_group_right_arm.getPlanningFrame();
+  std::string pr2_frame = move_group_arm.getPlanningFrame();
   pr2_frame.erase(0, 1);
 
   geometry_msgs::TransformStamped transform;
@@ -359,8 +371,8 @@ bool PickPlaceAction::PlaceCube(geometry_msgs::PoseStamped ps) {
 
     // ToolFrame to WristFrame transformation
     Eigen::Affine3d t3 =
-      tf2::transformToEigen(tfBuffer.lookupTransform("r_wrist_roll_link",
-                                                     "r_gripper_tool_frame",
+      tf2::transformToEigen(tfBuffer.lookupTransform(wrist_roll_link,
+                                                     gripper_tool_frame,
                                                      ros::Time(0)));
 
     Eigen::Affine3d t = t1 * t0 * t2 * t0.inverse();
@@ -406,7 +418,7 @@ bool PickPlaceAction::PlaceCube(geometry_msgs::PoseStamped ps) {
   moveit::core::RobotState postplace_robot_state = RobotStateFromPose(
                                                      postplace_pose);
 
-  bool success = Plan(*move_group_right_arm.getCurrentState(),
+  bool success = Plan(*move_group_arm.getCurrentState(),
                       preplace_robot_state,
                       preplace_plan);
   ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'preplace': " <<
@@ -420,17 +432,17 @@ bool PickPlaceAction::PlaceCube(geometry_msgs::PoseStamped ps) {
 
   if (success) {
     ROS_INFO_STREAM("[PICKPLACEACTION] Executing on the robot ...");
-    success = move_group_right_arm.execute(preplace_plan);
+    success = move_group_arm.execute(preplace_plan);
     ros::WallDuration(exec_wait_).sleep();
 
-    if (success) { success &= move_group_right_arm.execute(place_plan); }
+    if (success) { success &= move_group_arm.execute(place_plan); }
     ros::WallDuration(exec_wait_).sleep();
 
     SendGripperCommand(open_gripper_pos_);
 
     if (success) { success &= CheckGripperFinished(); }
 
-    if (success) { success &= move_group_right_arm.execute(postplace_plan); }
+    if (success) { success &= move_group_arm.execute(postplace_plan); }
     ROS_INFO_STREAM("[PICKPLACEACTION] MoveIt execution of plan: "
                     << ((success) ? "success" : "fail"));
   } else {
@@ -447,8 +459,8 @@ bool PickPlaceAction::Plan(moveit::core::RobotState start,
   if (orient_constraint.x != 0.0f && orient_constraint.y != 0.0f &&
       orient_constraint.z != 0.0f && orient_constraint.w != 0.0f) {
     moveit_msgs::OrientationConstraint ocm;
-    ocm.link_name = "r_wrist_roll_link";
-    ocm.header.frame_id = move_group_right_arm.getPlanningFrame();
+    ocm.link_name = wrist_roll_link;
+    ocm.header.frame_id = move_group_arm.getPlanningFrame();
     // Set the orientation of the final pose
     ocm.orientation = orient_constraint;
 
@@ -456,17 +468,17 @@ bool PickPlaceAction::Plan(moveit::core::RobotState start,
     // Set path constraint
     moveit_msgs::Constraints test_constraints;
     test_constraints.orientation_constraints.push_back(ocm);
-    move_group_right_arm.setPathConstraints(test_constraints);
+    move_group_arm.setPathConstraints(test_constraints);
   }
 
-  move_group_right_arm.setStartState(start);
-  move_group_right_arm.setJointValueTarget(end);
-  bool success = move_group_right_arm.plan(plan);
+  move_group_arm.setStartState(start);
+  move_group_arm.setJointValueTarget(end);
+  bool success = move_group_arm.plan(plan);
 
   if (orient_constraint.x != 0.0f && orient_constraint.y != 0.0f &&
       orient_constraint.z != 0.0f && orient_constraint.w != 0.0f) {
     // Clear path constraint
-    move_group_right_arm.clearPathConstraints();
+    move_group_arm.clearPathConstraints();
   }
 
   return success;
@@ -474,10 +486,10 @@ bool PickPlaceAction::Plan(moveit::core::RobotState start,
 
 moveit::core::RobotState PickPlaceAction::RobotStateFromPose(
   geometry_msgs::Pose p) {
-  moveit::core::RobotState state(*move_group_right_arm.getCurrentState());
+  moveit::core::RobotState state(*move_group_arm.getCurrentState());
   const robot_state::JointModelGroup* joint_model_group =
-    state.getJointModelGroup(move_group_right_arm.getName());
-  state.setFromIK(joint_model_group, p, "r_gripper_tool_frame");
+    state.getJointModelGroup(move_group_arm.getName());
+  state.setFromIK(joint_model_group, p, gripper_tool_frame);
   return state;
 }
 
@@ -503,7 +515,7 @@ bool PickPlaceAction::CheckGripperFinished() {
 moveit_msgs::CollisionObject PickPlaceAction::deleteObject(
   std::string object_id) {
   moveit_msgs::CollisionObject collision_object;
-  collision_object.header.frame_id = move_group_right_arm.getPlanningFrame();
+  collision_object.header.frame_id = move_group_arm.getPlanningFrame();
   collision_object.header.stamp = ros::Time::now();
   collision_object.id = object_id;
   // Remove any previous occurrences in the world

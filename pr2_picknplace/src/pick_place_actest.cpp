@@ -31,32 +31,35 @@ int main(int argc, char** argv) {
 
   if (n_cubes < 1) {ROS_ERROR("Please put at least 1 cube..."); return 1;}
   float height = 0.0254;
-  float y_off = 0.1;
+  float x_off = 0.1;
 
   geometry_msgs::Pose loc;
-  loc.position.x = 0.36;
+  loc.position.x = 0.0;
   loc.position.y = -0.44;
-  loc.position.z = 0.94;
-  loc.orientation.x = 0.70711;
+  loc.position.z = 0.025;
+  loc.orientation.x = 0;
   loc.orientation.y = 0;
-  loc.orientation.z = -0.70711;
-  loc.orientation.w = 0.0;
+  loc.orientation.z = 0;
+  loc.orientation.w = 1;
 
   // Const
   pr2_picknplace_msgs::PickPlaceGoal pick;
   pick.goal.request = 0;
+  pick.goal.header.frame_id = "tabletop";
 
   pr2_picknplace_msgs::PickPlaceGoal place;
   place.goal.request = 1;
+  place.goal.header.frame_id = "tabletop";
+
 
   pick.goal.object_pose = loc;
   pick.goal.object_pose.position.z += ((n_cubes - 1) * height);
   place.goal.object_pose = loc;
-  place.goal.object_pose.position.y -= y_off;
+  place.goal.object_pose.position.x -= x_off;
 
   for (int cube = 0; cube < n_cubes; ++cube) {
     ac.sendGoal(pick);
-    // ROS_INFO_STREAM("PickHeight: " << pick.goal.object_pose.position.z);
+    ROS_DEBUG_STREAM("PickHeight: " << pick.goal.object_pose.position.z);
     pick.goal.object_pose.position.z -= height;
 
     ac.waitForResult(ros::Duration(10.0));
@@ -64,7 +67,7 @@ int main(int argc, char** argv) {
     {return 1;}
 
     ac.sendGoal(place);
-    // ROS_INFO_STREAM("PlaceHeight: " << place.goal.object_pose.position.z);
+    ROS_DEBUG_STREAM("PlaceHeight: " << place.goal.object_pose.position.z);
     place.goal.object_pose.position.z += height;
 
     ac.waitForResult(ros::Duration(10.0));
