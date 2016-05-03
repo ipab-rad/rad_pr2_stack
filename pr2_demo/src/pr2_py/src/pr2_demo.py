@@ -34,8 +34,8 @@ def pick_n_place():
     raw_input("Press Enter to continue if Rviz visable...")
     pose_target = geometry_msgs.msg.Pose()
     pose_target.orientation.w = 1.0
-    pose_target.position.x = 0.7
-    pose_target.position.y = 0.05
+    pose_target.position.x = 0.5
+    pose_target.position.y = -0.05
     pose_target.position.z = 1.0
     left_arm.set_pose_target(pose_target)
 
@@ -44,10 +44,10 @@ def pick_n_place():
     print "============ Waiting while RVIZ displays plan1..."
     rospy.sleep(5)
 
-    # Uncomment below line when working with a real robot
-    #group.go(wait=True)
-    #rospy.sleep(10)
-    #raw_input("Press Enter to continue...")
+    # Uncomment to execute on robot
+    raw_input("Executed on real robot..")
+    left_arm.go(wait=True)
+    rospy.sleep(10)
 
     raw_input("Motion Completed\nPress Enter to Shutdown..")
 
