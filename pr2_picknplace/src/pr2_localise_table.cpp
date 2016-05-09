@@ -45,7 +45,8 @@ int main(int argc, char** argv) {
       ROS_INFO_STREAM("[PR2_LOCALISE_TABLE] Request: " << ((srv.response.success) ?
                                                            "Success" : "Failed"));
     } else {
-      ROS_ERROR("[PR2_LOCALISE_TABLE] Failed to call service `request_image`!\nPlease restart!");
+      ROS_ERROR("[PR2_LOCALISE_TABLE] Failed to call service `request_image`!\n"
+                "Please restart!");
       continue; //return 1;
     }
     ros::spinOnce();

@@ -26,10 +26,14 @@ PickPlaceAction::PickPlaceAction(ros::NodeHandle& nh, std::string name,
     wrist_roll_link = "r_wrist_roll_link";
     gripper_controller = "r_gripper_controller/gripper_action";
     gripper_tool_frame = "r_gripper_tool_frame";
-  } else {
+  } else if (arm == "left_arm") {
     wrist_roll_link = "l_wrist_roll_link";
     gripper_controller = "l_gripper_controller/gripper_action";
     gripper_tool_frame = "l_gripper_tool_frame";
+  } else {
+    ROS_ERROR_STREAM("Wrong parameter 'arm'. Given: '" << arm
+                     << "' was expecting 'left_arm' or 'right_arm'.");
+    return;
   }
 
   this->loadParams();
