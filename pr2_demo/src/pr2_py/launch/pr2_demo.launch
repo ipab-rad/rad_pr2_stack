@@ -33,7 +33,7 @@
     <!-- Octomap uses odom_combined, but map is doing SLAM -->
     <param name="frame_id" type="string" value="odom_combined" />
 
-    <param name="resolution" value="0.025" /> 
+    <param name="resolution" value="0.025" />
 
     <!-- maximum range to integrate (speedup, accuracy) -->
     <param name="max_sensor_range" value="5.0" />
