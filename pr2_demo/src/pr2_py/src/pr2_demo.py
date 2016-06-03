@@ -8,12 +8,12 @@ import tf2_ros
 import moveit_commander
 import moveit_msgs.msg
 import geometry_msgs.msg
-#import geometry_msgs.PoseStamped
-
+import std_msgs
 
 #from std_msgs.msg import String
-from geometry_msgs.msg import PoseStamped
+from geometry_msgs.msg import PoseStamped, Pose
 from moveit_msgs.msg import VisibilityConstraint, Constraints, OrientationConstraint, PositionConstraint
+from shape_msgs.msg import SolidPrimitive
 
 def callback(data):
     rospy.loginfo(rospy.get_caller_id()+ " Pose x : %s", data.pose.position.x)
@@ -59,7 +59,7 @@ def pick_n_place():
     while not rospy.is_shutdown():
         try:
             # trans = tfBuffer.lookup_transform('odom_combined', 'ros_hydro',
-            #                                   rospy.Time(0)) 
+            #                                   rospy.Time(0))
             # rospy.loginfo(trans)
             pose_target = geometry_msgs.msg.Pose()
             orient_target = tf.transformations.quaternion_from_euler(0,0,0)
@@ -74,7 +74,7 @@ def pick_n_place():
             constraints = Constraints()
             constraints.name = "Gripper Control"
 
-            # Create an orientation constraint for the right gripper 
+            # Create an orientation constraint for the right gripper
             orientation_constraint = OrientationConstraint()
             orientation_constraint.header.frame_id = "r_wrist_roll_link"
             orientation_constraint.link_name = right_arm.get_end_effector_link()
@@ -85,21 +85,38 @@ def pick_n_place():
             orientation_constraint.weight = 0.001
 
             # Append the constraint to the list of contraints
-            constraints.orientation_constraints.append(orientation_constraint)
+            # constraints.orientation_constraints.append(orientation_constraint)
 
             position_constraint = PositionConstraint()
             position_constraint.header.frame_id = "r_wrist_roll_link"
             position_constraint.link_name = right_arm.get_end_effector_link()
-            position_constraint.target_point_offset = 0;
-            position_constraint.constraint_region.primitive_poses = None 
-            position_constraint.weight = 0.01
-
+            # position_constraint.target_point_offset = 0;
+            # position_constraint.constraint_region.primitives.append(
+            #     SolidPrimitive(
+            #         type=SolidPrimitive.BOX,
+            #         dimensions = [1,1,1]))
+            # position_constraint.constraint_region.primitive_poses.append(Pose(
+            #     position=[0.5,0.2,0.6], orientation=[0,0,0,1]))
+            position_constraint.weight = 0.001
+            #
+            position_constraint.constraint_region.primitives.append(SolidPrimitive(type=SolidPrimitive.SPHERE,dimensions=[10]))
+            position_constraint.constraint_region.primitive_poses.append(pose_target)
+            constraints.position_constraints.append(position_constraint)
+            #
             rospy.loginfo(constraints)
 
             # Set the path constraints on the right_arm
             right_arm.set_path_constraints(constraints)
 
+            pose_temp = PoseStamped()
+            pose_temp.pose = pose_target
+            temp_header = std_msgs.msg.Header()
+            temp_header.stamp = rospy.Time.now()
+            temp_header.seq = 0
+            temp_header.frame_id = "odom_combined"
+            pose_temp.header = temp_header
 
+            # scene.add_sphere('test',pose_temp,10)
             # orient_target = geometry_msgs.msg.Pose()
             # quat = (
             #     trans.transform.rotation.x,
@@ -110,22 +127,22 @@ def pick_n_place():
             # rospy.loginfo('Checkin quar now')
             # rospy.loginfo(quat)
             rospy.loginfo('Checkin Euler now')
-            rospy.loginfo(orient_target)
+            # rospy.loginfo(orient_target)
 
             right_arm.set_start_state_to_current_state()
-            right_arm.set_pose_target(pose_target)
+            # right_arm.set_pose_target(pose_target)
 
             # right_arm.set_position_target([0.7,-0.6,1])
             # right_arm.set_rpy_target([0,-1,0])
             # right_arm.set_goal_orientation_tolerance(0.1)
             # right_arm.set_rpy_target(eular, 'r_wrist_roll_link')
             right_arm.allow_replanning(True)
-            rospy.loginfo(pose_target)
+            # rospy.loginfo(pose_target)
 
             # right_arm.set_goal_tolerance(0.1)
 
             plan1 = right_arm.plan()
-            rospy.sleep(2)
+            rospy.sleep(20)
 
             # right_arm.go(wait=True)
             # rospy.sleep(2)
