@@ -125,7 +125,7 @@ def pick_n_place():
             p1.orientation.x = trans.transform.rotation.x
             p1.orientation.y = trans.transform.rotation.y
             p1.orientation.z = trans.transform.rotation.z
-            p1.orientation.w = trans.transform.rotation.w
+            p1.orientation.w = 1
             tar.pose = p1
 
             tar1 = geometry_msgs.msg.PoseStamped()
@@ -136,10 +136,7 @@ def pick_n_place():
             p1.position.x = trans1.transform.translation.x
             p1.position.y = trans1.transform.translation.y
             p1.position.z = trans1.transform.translation.z
-            p1.orientation.x = trans1.transform.rotation.x
-            p1.orientation.y = trans1.transform.rotation.y
-            p1.orientation.z = trans1.transform.rotation.z
-            p1.orientation.w = trans1.transform.rotation.w
+            p1.orientation.w = 1
             tar1.pose = p1
 
             vis_constraint = VisibilityConstraint()
@@ -147,8 +144,8 @@ def pick_n_place():
             vis_constraint.target_radius = 0.1
             vis_constraint.target_pose = tar
             vis_constraint.sensor_pose = tar1
-            vis_constraint.cone_sides = 3
-            vis_constraint.max_view_angle = 1.3
+            vis_constraint.cone_sides = 4
+            vis_constraint.max_view_angle = 1.7
             vis_constraint.weight = 1
             constraints.visibility_constraints.append(vis_constraint)
 
@@ -180,7 +177,7 @@ def pick_n_place():
             # right_arm.allow_replanning(True)
             # rospy.loginfo(pose_target)
 
-            right_arm.set_goal_tolerance(10)
+            right_arm.set_goal_tolerance(0.0001)
 
             plan1 = right_arm.plan()
             # rospy.sleep(2)
