@@ -12,7 +12,10 @@ import std_msgs
 
 #from std_msgs.msg import String
 from geometry_msgs.msg import PoseStamped, Pose, Vector3
-from moveit_msgs.msg import VisibilityConstraint, Constraints, OrientationConstraint, PositionConstraint
+from moveit_msgs.msg import (VisibilityConstraint, Constraints,
+                             OrientationConstraint, PositionConstraint,
+                             Grasp, GripperTranslation)
+
 from shape_msgs.msg import SolidPrimitive
 
 def callback(data):
@@ -90,78 +93,47 @@ def pick_n_place():
             pose_target.position.y = 0.0 # trans.transform.translation.y
             pose_target.position.z = 0.9 #trans.transform.translation.z
 
-
-            constraints = Constraints()
-            constraints.name = "Gripper Control"
-
-            # Create an orientation constraint for the right gripper
-            # orientation_constraint = OrientationConstraint()
-            # orientation_constraint.header.frame_id = "r_wrist_roll_link"
-            # orientation_constraint.link_name = right_arm.get_end_effector_link()
-            # orientation_constraint.orientation = pose_target.orientation
-            # orientation_constraint.absolute_x_axis_tolerance = 10
-            # orientation_constraint.absolute_y_axis_tolerance = 10
-            # orientation_constraint.absolute_z_axis_tolerance = 10
-            # orientation_constraint.weight = 0.1
+            pre_grasp = GripperTranslation()
+            pre_grasp.desired_distance = 0.2
+            pre_grasp.min_distance = 0.001
+            pre_grasp.direction.header.frame_id = 'r_wrist_roll_link'
+            pre_grasp.direction.header.stamp = rospy.Time.now()
+            pre_grasp.direction.vector = Vector3(1,0,0)
+            g = Grasp()
+            g.pre_grasp_approach = pre_grasp
+            right_arm.pick('test', g)
             #
-            # # Append the constraint to the list of contraints
-            # constraints.orientation_constraints.append(orientation_constraint)
-
-
-
-            trans1 = tfBuffer.lookup_transform('odom_combined',
-                                               'r_wrist_roll_link',
-                                              rospy.Time(0))
-            tar = geometry_msgs.msg.PoseStamped()
-            tar_header = std_msgs.msg.Header()
-            tar_header.stamp = rospy.Time.now()
-            tar_header.seq = 0
-            tar_header.frame_id = 'ros_hydro'
-            tar.header = tar_header
-            p1 = geometry_msgs.msg.Pose()
-            p1.position.x = trans.transform.translation.x
-            p1.position.y = trans.transform.translation.y
-            p1.position.z = trans.transform.translation.z
-            p1.orientation.x = trans.transform.rotation.x
-            p1.orientation.y = trans.transform.rotation.y
-            p1.orientation.z = trans.transform.rotation.z
-            p1.orientation.w = 1
-            tar.pose = p1
-
-            tar1 = geometry_msgs.msg.PoseStamped()
-            tar_header.stamp = rospy.Time.now()
-            tar_header.seq = 0
-            tar_header.frame_id = 'r_wrist_roll_link'
-            tar1.header = tar_header
-            p1.position.x = trans1.transform.translation.x
-            p1.position.y = trans1.transform.translation.y
-            p1.position.z = trans1.transform.translation.z
-            p1.orientation.w = 1
-            tar1.pose = p1
-
-            vis_constraint = VisibilityConstraint()
-
-            vis_constraint.target_radius = 0.1
-            vis_constraint.target_pose = tar
-            vis_constraint.sensor_pose = tar1
-            vis_constraint.cone_sides = 4
-            vis_constraint.max_view_angle = 1.7
-            vis_constraint.weight = 1
-            constraints.visibility_constraints.append(vis_constraint)
-
-            # position_constraint = PositionConstraint()
-            # position_constraint.header.frame_id = "r_wrist_roll_link"
-            # position_constraint.link_name = right_arm.get_end_effector_link()
-            # position_constraint.weight = 0.001
-            # position_constraint.target_point_offset = Vector3(0.2,0,0)
-            # # position_constraint.constraint_region.primitives.append(SolidPrimitive(type=SolidPrimitive.SPHERE,dimensions=[10]))
-            # position_constraint.constraint_region.primitive_poses.append(pose_target)
-            # constraints.position_constraints.append(position_constraint)
-
-            rospy.loginfo(constraints)
-
-            # Set the path constraints on the right_arm
-            right_arm.set_path_constraints(constraints)
+            #
+            # constraints = Constraints()
+            # constraints.name = "Gripper Control"
+            #
+            # # Create an orientation constraint for the right gripper
+            # # orientation_constraint = OrientationConstraint()
+            # # orientation_constraint.header.frame_id = "r_wrist_roll_link"
+            # # orientation_constraint.link_name = right_arm.get_end_effector_link()
+            # # orientation_constraint.orientation = pose_target.orientation
+            # # orientation_constraint.absolute_x_axis_tolerance = 10
+            # # orientation_constraint.absolute_y_axis_tolerance = 10
+            # # orientation_constraint.absolute_z_axis_tolerance = 10
+            # # orientation_constraint.weight = 0.1
+            # #
+            # # # Append the constraint to the list of contraints
+            # # constraints.orientation_constraints.append(orientation_constraint)
+            #
+            #
+            # # position_constraint = PositionConstraint()
+            # # position_constraint.header.frame_id = "r_wrist_roll_link"
+            # # position_constraint.link_name = right_arm.get_end_effector_link()
+            # # position_constraint.weight = 0.001
+            # # position_constraint.target_point_offset = Vector3(0.2,0,0)
+            # # # position_constraint.constraint_region.primitives.append(SolidPrimitive(type=SolidPrimitive.SPHERE,dimensions=[10]))
+            # # position_constraint.constraint_region.primitive_poses.append(pose_target)
+            # # constraints.position_constraints.append(position_constraint)
+            #
+            # rospy.loginfo(constraints)
+            #
+            # # Set the path constraints on the right_arm
+            # right_arm.set_path_constraints(constraints)
 
             rospy.loginfo('Checkin Euler now')
             # rospy.loginfo(orient_target)
