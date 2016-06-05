@@ -11,12 +11,54 @@ import geometry_msgs.msg
 import std_msgs
 
 #from std_msgs.msg import String
+# from scipy import linalg
+from numpy import *
 from geometry_msgs.msg import PoseStamped, Pose, Vector3
 from moveit_msgs.msg import (VisibilityConstraint, Constraints,
                              OrientationConstraint, PositionConstraint,
                              Grasp, GripperTranslation)
 
 from shape_msgs.msg import SolidPrimitive
+
+
+def pose_from_vector3D(waypoint):
+    #http://lolengine.net/blog/2013/09/18/beautiful-maths-quaternion-from-vectors
+    pose= Pose()
+    pose.position.x = waypoint[0]
+    pose.position.y = waypoint[1]
+    pose.position.z = waypoint[2]
+    #calculating the half-way vector.
+    u = [1,0,0]
+    norm = linalg.norm(waypoint[3:])
+    v = asarray(waypoint[3:])/norm
+    if (array_equal(u, v)):
+        pose.orientation.w = 1
+        pose.orientation.x = 0
+        pose.orientation.y = 0
+        pose.orientation.z = 0
+    elif (array_equal(u, negative(v))):
+        pose.orientation.w = 0
+        pose.orientation.x = 0
+        pose.orientation.y = 0
+        pose.orientation.z = 1
+    else:
+        half = [u[0]+v[0], u[1]+v[1], u[2]+v[2]]
+        pose.orientation.w = dot(u, half)
+        temp = cross(u, half)
+        pose.orientation.x = temp[0]
+        pose.orientation.y = temp[1]
+        pose.orientation.z = temp[2]
+    norm = math.sqrt(pose.orientation.x*pose.orientation.x +
+                     pose.orientation.y*pose.orientation.y +
+                     pose.orientation.z*pose.orientation.z +
+                     pose.orientation.w*pose.orientation.w)
+    if norm == 0:
+        norm = 1
+    pose.orientation.x /= norm
+    pose.orientation.y /= norm
+    pose.orientation.z /= norm
+    pose.orientation.w /= norm
+    return pose
 
 def callback(data):
     rospy.loginfo(rospy.get_caller_id()+ " Pose x : %s", data.pose.position.x)
@@ -28,43 +70,6 @@ def get_pose():
     rospy.init_node('get_pose',anonymous=True)
     #rospy.Subscriber('/simtrack/ros_hydro_throttled', PoseStamped, callback, queue_size=1)
     rospy.spin()
-
-def pose_from_vector3D(waypoint):
-     #http://lolengine.net/blog/2013/09/18/beautiful-maths-quaternion-from-vectors
-     pose= Pose()
-     pose.position.x = waypoint[0]
-     pose.position.y = waypoint[1]
-     pose.position.z = waypoint[2] 
-     #calculating the half-way vector.
-     u = [1,0,0]
-     norm = linalg.norm(waypoint[3:])
-     v = asarray(waypoint[3:])/norm 
-     if (array_equal(u, v)):
-         pose.orientation.w = 1
-         pose.orientation.x = 0
-         pose.orientation.y = 0
-         pose.orientation.z = 0
-     elif (array_equal(u, negative(v))):
-         pose.orientation.w = 0
-         pose.orientation.x = 0
-         pose.orientation.y = 0
-         pose.orientation.z = 1
-     else:
-         half = [u[0]+v[0], u[1]+v[1], u[2]+v[2]]
-         pose.orientation.w = dot(u, half)
-         temp = cross(u, half)
-         pose.orientation.x = temp[0]
-         pose.orientation.y = temp[1]
-         pose.orientation.z = temp[2]
-     norm = math.sqrt(pose.orientation.x*pose.orientation.x + pose.orientation.y*pose.orientation.y + 
-         pose.orientation.z*pose.orientation.z + pose.orientation.w*pose.orientation.w)
-     if norm == 0:
-         norm = 1
-     pose.orientation.x /= norm
-     pose.orientation.y /= norm
-     pose.orientation.z /= norm
-     pose.orientation.w /= norm
-     return pose
 
 def pick_n_place():
     ## Inititialise moveit_commander and rospy
@@ -126,34 +131,11 @@ def pick_n_place():
             pose_target.orientation.y = orient_target[1]
             pose_target.orientation.z = orient_target[2]
             pose_target.orientation.w = orient_target[3]
-            pose_target.position.x = trans.transform.translation.x
-            pose_target.position.y = trans.transform.translation.y
-            pose_target.position.z =trans.transform.translation.z
-            #
-            # pre_grasp = GripperTranslation()
-            # pre_grasp.desired_distance = 0.1
-            # pre_grasp.min_distance = 0.001
-            # pre_grasp.direction.header.frame_id = 'odom_combined'
-            # pre_grasp.direction.header.stamp = rospy.Time.now()
-            # pre_grasp.direction.vector = Vector3(1,1,1)
-            # g = Grasp()
-            # g.max_contact_force = 0
-            # g.pre_grasp_approach = pre_grasp
-            #
-            # post_grasp = GripperTranslation()
-            # post_grasp.desired_distance = 0.1
-            # post_grasp.min_distance = 0.001
-            # post_grasp.direction.header.frame_id = 'odom_combined'
-            # post_grasp.direction.header.stamp = rospy.Time.now()
-            # post_grasp.direction.vector = Vector3(0,0,1)
-            # g.post_grasp_retreat = post_grasp
-            #
-            p = PoseStamped()
-            p.pose = pose_target
-            # p.pose.position.x = p.pose.position.x + .2
-            p.header.frame_id = right_arm.get_planning_frame()
-            scene.add_box('test', p, (0.1,0.1,0.1))
-            right_arm.pick('test')
+            pose_target.position.x = 0.5 # trans.transform.translation.x - 0.21
+            pose_target.position.y = 0.0 # trans.transform.translation.y
+            pose_target.position.z = 0.9 #trans.transform.translation.z
+
+            pose_target = pose_from_vector3D((0.5,0.0,0.9,0,1,0))
             #
             #
             # constraints = Constraints()
@@ -191,7 +173,7 @@ def pick_n_place():
             # rospy.loginfo(orient_target)
 
             # right_arm.set_start_state_to_current_state()
-            # right_arm.set_pose_target(pose_target)
+            right_arm.set_pose_target(pose_target)
             # right_arm.allow_looking(True)
 
             # right_arm.set_position_target([0.7,-0.6,1])
@@ -203,26 +185,20 @@ def pick_n_place():
 
             right_arm.set_goal_tolerance(0.0001)
 
-            # plan1 = right_arm.plan()
+            plan1 = right_arm.plan()
             # rospy.sleep(2)
 
             # right_arm.go(wait=True)
-            rospy.sleep(2)
+            # rospy.sleep(2)
 
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException,
                 tf2_ros.ExtrapolationException):
             rospy.loginfo('Error')
+            p = Pose()
+            p = pose_from_vector3D((1,1,1,0,0,0,0,1))
             rospy.sleep(1)
             continue
 
-
-    print "============ Waiting while RVIZ displays plan1..."
-    rospy.sleep(5)
-
-    # Uncomment to execute on robot
-    #raw_input("Executed on real robot..")
-    #right_arm.go(wait=True)
-    #rospy.sleep(10)
 
     raw_input("Motion Completed\nPress Enter to Shutdown..")
 
