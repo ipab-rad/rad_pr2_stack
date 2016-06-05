@@ -20,6 +20,14 @@ from moveit_msgs.msg import (VisibilityConstraint, Constraints,
 
 from shape_msgs.msg import SolidPrimitive
 
+def qv_mult(q1, v1):
+    v1 = tf.transformations.unit_vector(v1)
+    q2 = list(v1)
+    q2.append(0.0)
+    return tf.transformations.quaternion_multiply(
+        tf.transformations.quaternion_multiply(q1, q2), 
+        tf.transformations.quaternion_conjugate(q1)
+    )[:3]
 
 def pose_from_vector3D(waypoint):
     #http://lolengine.net/blog/2013/09/18/beautiful-maths-quaternion-from-vectors
@@ -135,7 +143,17 @@ def pick_n_place():
             pose_target.position.y = 0.0 # trans.transform.translation.y
             pose_target.position.z = 0.9 #trans.transform.translation.z
 
-            pose_target = pose_from_vector3D((0.5,0.0,0.9,0,1,0))
+            lookat = (trans.transform.translation.x - 0.5,
+                      trans.transform.translation.y - 0.0,
+                      trans.transform.translation.z - 0.9)
+            rospy.loginfo("New directions to look at")
+            rospy.loginfo(lookat)
+
+
+            rot_vec = qv_mult(orient_target,(1,0,0))
+            rospy.loginfo(rot_vec)
+            pose_target = pose_from_vector3D((0.5,0.0,0.9,
+                                              lookat[0],lookat[1],lookat[2]))
             #
             #
             # constraints = Constraints()
@@ -186,7 +204,7 @@ def pick_n_place():
             right_arm.set_goal_tolerance(0.0001)
 
             plan1 = right_arm.plan()
-            # rospy.sleep(2)
+            rospy.sleep(2)
 
             # right_arm.go(wait=True)
             # rospy.sleep(2)
