@@ -5,6 +5,7 @@ import copy
 import rospy
 import tf
 import tf2_ros
+import tf2_geometry_msgs
 import moveit_commander
 import moveit_msgs.msg
 import geometry_msgs.msg
@@ -122,11 +123,11 @@ def pick_n_place():
     robot = moveit_commander.RobotCommander()
     scene = moveit_commander.PlanningSceneInterface()
 
-    right_arm = moveit_commander.MoveGroupCommander("right_arm");
+    dual_arm = moveit_commander.MoveGroupCommander("arms");
 
-    right_arm.set_planner_id('RRTConnectkConfigDefault')
+    dual_arm.set_planner_id('RRTConnectkConfigDefault')
 
-    right_arm.set_planning_time(1)
+    dual_arm.set_planning_time(1)
 
     display_trajectory_publisher = rospy.Publisher(
         '/move_group/display_planned_path',
@@ -161,23 +162,10 @@ def pick_n_place():
             scene.add_box('ros_hydro', pose_target, (0.2,0.28,0.01) )
 
 
-            #First we get a vector and rotate it to match the object X orientation
-            rot_vec = qv_mult((pose_target.pose.orientation.x,
-                              pose_target.pose.orientation.y,
-                              pose_target.pose.orientation.z,
-                              pose_target.pose.orientation.w),
-                              (1,0,0)) # Rotate vector by quaternion
-            rospy.loginfo('Rotation Vector: ')
-            rospy.loginfo(rot_vec)
 
-            # rot_vec = (0,0,0) + (0.3 * rot_vec)
+            pose_goal = pose_from_vector3D((0.3,0,0,-1,0,0))
 
-            # Convert it into a pose that we will use for the box marker
-            pose_goal = pose_from_vector3D((0,0,0,rot_vec[0],rot_vec[1],
-                                          rot_vec[2]))
-
-
-            box_marker = create_marker(Marker.ARROW,[.5,.04,.04],
+            box_marker = create_marker(Marker.ARROW,[.2,.01,.01],
                                        frame = 'ros_hydro', ns = 'arrow',
                                       pos =(pose_goal.position.x,
                                             pose_goal.position.y,
@@ -189,24 +177,52 @@ def pick_n_place():
                                               pose_goal.orientation.w))
             box_marker.color.a = 1
 
-            trans_vec = pose_from_vector3D((pose_target.pose.position.x,
-                                            pose_target.pose.position.y,
-                                            pose_target.pose.position.z,
-                                            pose_target.pose.orientation.x,
-                                            pose_target.pose.orientation.y,
-                                            pose_target.pose.orientation.z,
-                                            pose_target.pose.orientation.w))
+            # rospy.loginfo(trans_vec)
+
+            marker_pub.publish(box_marker)
+
+
+            p = PoseStamped()
+            p.header = box_marker.header
+            p.pose = box_marker.pose
+            r_goal = tf2_geometry_msgs.do_transform_pose(p,trans)
+            rospy.loginfo("================Transformed Pose=========================")
+            rospy.loginfo(r_goal)
+
+
+            # Left Arm
+            pose_goal = pose_from_vector3D((-0.3,0,0,1,0,0))
+
+            box_marker = create_marker(Marker.ARROW,[.2,.01,.01],
+                                       frame = 'ros_hydro', ns = 'arrow',
+                                      pos =(pose_goal.position.x,
+                                            pose_goal.position.y,
+                                            pose_goal.position.z),
+                                      color = (0,0.5, 1.0),
+                                      quat = (pose_goal.orientation.x,
+                                              pose_goal.orientation.y,
+                                              pose_goal.orientation.z,
+                                              pose_goal.orientation.w))
+            box_marker.color.a = 1
 
             # rospy.loginfo(trans_vec)
 
             marker_pub.publish(box_marker)
 
 
-            right_arm.set_goal_tolerance(0.1)
-            right_arm.set_pose_target(pose_target)
-            right_arm.plan()
-            # rospy.sleep(2)
-            # right_arm.go(wait=True)
+            p = PoseStamped()
+            p.header = box_marker.header
+            p.pose = box_marker.pose
+            l_goal = tf2_geometry_msgs.do_transform_pose(p,trans)
+            rospy.loginfo("================Transformed Pose=========================")
+            rospy.loginfo(l_goal)
+
+            dual_arm.set_goal_tolerance(0.1)
+            dual_arm.set_pose_target(r_goal, 'r_wrist_roll_link')
+            dual_arm.set_pose_target(l_goal, 'l_wrist_roll_link')
+            dual_arm.plan()
+            rospy.sleep(2)
+            # dual_arm.go(wait=True)
             # rospy.sleep(2)
 
             # look_at = tfBuffer.lookup_transform(
