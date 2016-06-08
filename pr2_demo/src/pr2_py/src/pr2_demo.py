@@ -87,7 +87,7 @@ def get_pose():
 def create_marker(type, dims, frame, ns = 'points', id = 0., duration = 1., color = [1,0,0], opaque = 0.5, pos = [0.,0.,0.], quat = [0.,0.,0.,1.]):
     marker = Marker()
     marker.header.frame_id = frame
-    marker.header.stamp = rospy.Time.now()
+    marker.header.stamp = rospy.Time(0)
     marker.ns = ns
     marker.type = type
     marker.action = Marker.ADD
@@ -111,6 +111,20 @@ def create_marker(type, dims, frame, ns = 'points', id = 0., duration = 1., colo
 
 ###################################################################
 
+def add_scene_object(name = 'ros_hydro', obj_type = 'box',
+                     ref_frame = 'odom_combined', size = (0.1,0.1,0.1)):
+    pose =  PoseStamped()
+    pose.header.frame_id = ref_frame
+    pose.header.stamp = rospy.Time(0)
+    pose.position = (0,0,0)
+    pose.orientation = (0,0,0,1)
+
+    if obj_type == 'sphere':
+        return 0
+    else:
+        scene.add_box(name,pose,size)
+
+
 
 
 def pick_n_place():
@@ -127,7 +141,7 @@ def pick_n_place():
 
     dual_arm.set_planner_id('RRTConnectkConfigDefault')
 
-    dual_arm.set_planning_time(1)
+    dual_arm.set_planning_time(0.5)
 
     display_trajectory_publisher = rospy.Publisher(
         '/move_group/display_planned_path',
@@ -148,7 +162,7 @@ def pick_n_place():
 
             pose_target = geometry_msgs.msg.PoseStamped()
             pose_target.header.frame_id = 'odom_combined'
-            pose_target.header.stamp = rospy.Time.now()
+            pose_target.header.stamp = rospy.Time(0)
             pose_target.pose.position.x = trans.transform.translation.x
             pose_target.pose.position.y = trans.transform.translation.y
             pose_target.pose.position.z = trans.transform.translation.z
@@ -159,11 +173,11 @@ def pick_n_place():
 
             # rospy.loginfo(pose_target)
 
-            scene.add_box('ros_hydro', pose_target, (0.2,0.28,0.01) )
+            # scene.add_box('ros_hydro', pose_target, (0.2,0.28,0.01) )
 
 
 
-            pose_goal = pose_from_vector3D((0.3,0,0,-1,0,0))
+            pose_goal = pose_from_vector3D((0.31,0,-0.07,-1,0,0))
 
             box_marker = create_marker(Marker.ARROW,[.2,.01,.01],
                                        frame = 'ros_hydro', ns = 'arrow',
@@ -191,7 +205,7 @@ def pick_n_place():
 
 
             # Left Arm
-            pose_goal = pose_from_vector3D((-0.3,0,0,1,0,0))
+            pose_goal = pose_from_vector3D((-0.32,0,-0.07,1,0,0))
 
             box_marker = create_marker(Marker.ARROW,[.2,.01,.01],
                                        frame = 'ros_hydro', ns = 'arrow',
@@ -210,19 +224,20 @@ def pick_n_place():
             marker_pub.publish(box_marker)
 
 
-            p = PoseStamped()
             p.header = box_marker.header
             p.pose = box_marker.pose
             l_goal = tf2_geometry_msgs.do_transform_pose(p,trans)
             rospy.loginfo("================Transformed Pose=========================")
             rospy.loginfo(l_goal)
 
-            dual_arm.set_goal_tolerance(0.1)
+            dual_arm.set_goal_tolerance(0.01)
+            # dual_arm.allow_replanning(True)
             dual_arm.set_pose_target(r_goal, 'r_wrist_roll_link')
             dual_arm.set_pose_target(l_goal, 'l_wrist_roll_link')
+            dual_arm.set_start_state_to_current_state()
             dual_arm.plan()
-            rospy.sleep(2)
-            # dual_arm.go(wait=True)
+            # rospy.sleep(2)
+            dual_arm.go(wait=True)
             # rospy.sleep(2)
 
             # look_at = tfBuffer.lookup_transform(
