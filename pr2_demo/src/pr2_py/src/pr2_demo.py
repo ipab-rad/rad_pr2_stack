@@ -156,20 +156,48 @@ def pick_n_place():
             pose_target.pose.orientation.z = trans.transform.rotation.z
             pose_target.pose.orientation.w = trans.transform.rotation.w
 
-            rospy.loginfo(pose_target)
+            # rospy.loginfo(pose_target)
 
             scene.add_box('ros_hydro', pose_target, (0.2,0.28,0.01) )
+
+
+            #First we get a vector and rotate it to match the object X orientation
+            rot_vec = qv_mult((pose_target.pose.orientation.x,
+                              pose_target.pose.orientation.y,
+                              pose_target.pose.orientation.z,
+                              pose_target.pose.orientation.w),
+                              (1,0,0)) # Rotate vector by quaternion
+            rospy.loginfo('Rotation Vector: ')
+            rospy.loginfo(rot_vec)
+
+            # rot_vec = (0,0,0) + (0.3 * rot_vec)
+
+            # Convert it into a pose that we will use for the box marker
+            pose_goal = pose_from_vector3D((0,0,0,rot_vec[0],rot_vec[1],
+                                          rot_vec[2]))
+
+
             box_marker = create_marker(Marker.ARROW,[.5,.04,.04],
-                                       frame = 'odom_combined', ns = 'arrow',
-                                      pos = (pose_target.pose.position.x + 0.1,
-                                             pose_target.pose.position.y,
-                                             pose_target.pose.position.z),
+                                       frame = 'ros_hydro', ns = 'arrow',
+                                      pos =(pose_goal.position.x,
+                                            pose_goal.position.y,
+                                            pose_goal.position.z),
                                       color = (0,0.9, 1.0),
-                                      quat = (pose_target.pose.orientation.x,
-                                              pose_target.pose.orientation.y,
-                                              pose_target.pose.orientation.z,
-                                              pose_target.pose.orientation.w))
+                                      quat = (pose_goal.orientation.x,
+                                              pose_goal.orientation.y,
+                                              pose_goal.orientation.z,
+                                              pose_goal.orientation.w))
             box_marker.color.a = 1
+
+            trans_vec = pose_from_vector3D((pose_target.pose.position.x,
+                                            pose_target.pose.position.y,
+                                            pose_target.pose.position.z,
+                                            pose_target.pose.orientation.x,
+                                            pose_target.pose.orientation.y,
+                                            pose_target.pose.orientation.z,
+                                            pose_target.pose.orientation.w))
+
+            # rospy.loginfo(trans_vec)
 
             marker_pub.publish(box_marker)
 
@@ -183,7 +211,7 @@ def pick_n_place():
 
             # look_at = tfBuffer.lookup_transform(
             #     'r_wrist_roll_link',
-            #     'ros_hydro', 
+            #     'ros_hydro',
             #     rospy.Time(0))
             # look_at = trans
             # # orient_target = geometry_msgs.msg.Pose()
