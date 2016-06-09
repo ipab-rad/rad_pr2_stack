@@ -1,6 +1,6 @@
-arm: left_arm
-add_table: true
+arm: right_arm
+add_table: false
 max_planning_time: 10.0
-open_gripper_pos: 0.05
-close_gripper_pos: 0.025
-close_effort: 50.0
+open_gripper_pos: 0.06
+close_gripper_pos: 0.01
+close_effort: 100.0

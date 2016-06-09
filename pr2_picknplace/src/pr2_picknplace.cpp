@@ -17,12 +17,12 @@ int main(int argc, char** argv) {
   spinner.start();
 
   std::string arm;
-  if (!ros::param::get("arm", arm)) {
-    ROS_WARN("[PICKPLACE] Arm was not chosen! Using left as default");
-    arm = "left_arm";
+  if (!ros::param::get("/pick_place/arm", arm)) {
+    ROS_ERROR("Cannot read parameters!");
+    ros::shutdown();
   }
-  PickPlaceAction pick_place(nh, "pick_place", arm);
 
+  PickPlaceAction pick_place(nh, "pick_place", arm);
   ros::Rate r(10);
 
   while (ros::ok()) {
@@ -31,6 +31,5 @@ int main(int argc, char** argv) {
   }
 
   ros::shutdown();
-
   return 0;
 }
