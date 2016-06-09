@@ -7,14 +7,16 @@
         <param name="camera_ns" type="str" value="$(arg camera_namespace)" />
     </node>
 
-    <node name="apriltag_detector" pkg="apriltags_ros" type="apriltag_detector_node" output="screen" ns="pr2_cam">
-        <remap from="image_rect" to="$(arg camera_namespace)/image_raw"/>
+    <node name="image_proc_prosilica_camera" pkg="image_proc" type="image_proc" ns="$(arg camera_namespace)" output="screen"/>
+
+    <node name="apriltag_detector" pkg="apriltags_ros" type="apriltag_detector_node" output="screen" ns="$(arg camera_namespace)">
+        <remap from="image_rect" to="$(arg camera_namespace)/image_rect_color"/>
         <remap from="camera_info" to="$(arg camera_namespace)/camera_info"/>
         <param name="image_transport" type="str" value="compressed" />
-        <param name="tf_frame" value="high_def_frame"/>
+        <param name="sensor_frame_id" value="high_def_optical_frame"/>
         <rosparam param="tag_descriptions">[
-            {id: 39, size: 0.14, frame_id: tag_39},
-            {id: 11, size: 0.14, frame_id: tag_11}]
+            {id: 121, size: 0.14, frame_id: prosilica_tag_121_AT_not_chained}]
         </rosparam>
     </node>
+
 </launch>

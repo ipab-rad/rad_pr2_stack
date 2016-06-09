@@ -40,10 +40,10 @@ int main(int argc, char** argv) {
 
   ros::Rate r(30);
   while (ros::ok()) {
-    ROS_INFO("[PR2_LOCALISE_TABLE] TODO: Stream tf");
     if (req_image.call(srv)) {
-      ROS_INFO_STREAM("[PR2_LOCALISE_TABLE] Request: " << ((srv.response.success) ?
-                                                           "Success" : "Failed"));
+      ROS_INFO_STREAM_THROTTLE(60, "[PR2_LOCALISE_TABLE] Request: " <<
+                               ((srv.response.success) ?
+                                "Success" : "Failed"));
     } else {
       ROS_ERROR("[PR2_LOCALISE_TABLE] Failed to call service `request_image`!\n"
                 "Please restart!");
