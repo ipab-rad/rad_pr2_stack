@@ -5,6 +5,7 @@ project(pr2_grasp_manager)
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
+  pr2_picknplace_msgs
   geometry_msgs
   haf_grasping
   moveit_msgs
@@ -104,7 +105,7 @@ find_package(haf_grasping REQUIRED)
 catkin_package(
  INCLUDE_DIRS include
 #  LIBRARIES pr2_grasp_manager
- CATKIN_DEPENDS geometry_msgs haf_grasping moveit_msgs std_msgs sensor_msgs
+ CATKIN_DEPENDS geometry_msgs haf_grasping moveit_msgs std_msgs sensor_msgs pr2_picknplace_msgs
  # DEPENDS haf_grasping
 )
 
@@ -138,7 +139,8 @@ add_executable(pr2_grasp_manager
   src/grasp_manager.cpp)
 
 add_dependencies(pr2_grasp_manager
-  haf_grasping_gencpp)
+  haf_grasping_gencpp
+  pr2_picknplace_msgs_gencpp)
 
 target_link_libraries(pr2_grasp_manager
   ${catkin_LIBRARIES}
