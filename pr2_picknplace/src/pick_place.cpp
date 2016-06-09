@@ -63,7 +63,8 @@ PickPlaceAction::~PickPlaceAction() {
 
 void PickPlaceAction::loadParams() {
   ROS_INFO("[PICKPLACEACTION] Loading parameters.");
-  if (!nh_.getParam(ns_ + "/max_planning_time", max_planning_time)) {
+  ROS_INFO_STREAM("NAMESPACE: " << ns_);
+  if (!ros::param::get(ns_ + "/max_planning_time", max_planning_time)) {
     ROS_WARN("[PICKPLACEACTION] Parameters were not loaded! Using default.");
   }
   ros::param::param(ns_ + "/max_planning_time", max_planning_time, 10.0);

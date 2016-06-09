@@ -1,12 +1,10 @@
 <?xml version="1.0"?>
 
 <launch>
-        <node pkg="tf" type="static_transform_publisher" name="table_pr2_static_tf" args="1 0 0.73 0 0 0.707 -0.707 /odom_combined /tabletop 100" />
-        <group ns="pick_place">
-                <rosparam file="$(find pr2_picknplace)/cfg/picknplace_config.yaml" command="load" />
-        </group>
-        <node name="pr2_picknplace" pkg="pr2_picknplace" type="pr2_picknplace" output="screen" clear_params="true">
-            <remap from="pr2_picknplace/collision_object" to="/collision_object" />
-            <remap from="pr2_picknplace/attached_collision_object" to="/attached_collision_object" />
-        </node>
+<!--   <node pkg="tf" type="static_transform_publisher" name="table_pr2_static_tf" args="1 0 0.73 0 0 0.707 -0.707 /odom_combined /tabletop 100" /> -->
+  <rosparam file="$(find pr2_picknplace)/cfg/picknplace_config.yaml" ns="pick_place" command="load" />
+  <node name="pr2_picknplace" pkg="pr2_picknplace" type="pr2_picknplace" output="screen" clear_params="true">
+      <remap from="pr2_picknplace/collision_object" to="/collision_object" />
+      <remap from="pr2_picknplace/attached_collision_object" to="/attached_collision_object" />
+  </node>
 </launch>
