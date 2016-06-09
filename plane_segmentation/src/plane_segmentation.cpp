@@ -35,13 +35,20 @@
 #include <pcl/io/pcd_io.h>
 #include <vtkRenderWindow.h>
 
-// Consts
-const unsigned char colour_r_min = 50;
-const unsigned char colour_r_max = 255;
-const unsigned char colour_g_min = 50;
-const unsigned char colour_g_max = 255;
-const unsigned char colour_b_min = 0;
-const unsigned char colour_b_max = 255;
+// Colour params
+unsigned char colour_r_min;
+unsigned char colour_r_max;
+unsigned char colour_g_min;
+unsigned char colour_g_max;
+unsigned char colour_b_min;
+unsigned char colour_b_max;
+
+unsigned char colour_r_min_new;
+unsigned char colour_r_max_new;
+unsigned char colour_g_min_new;
+unsigned char colour_g_max_new;
+unsigned char colour_b_min_new;
+unsigned char colour_b_max_new;
 
 // Params
 bool segment_objects;
@@ -120,6 +127,12 @@ void update_params(bool& should_update) {
     colour_filtering = colour_filtering_new;
     publish_planes = publish_planes_new;
     publish_outliers = publish_outliers_new;
+    colour_r_min = colour_r_min_new;
+    colour_r_max = colour_r_max_new;
+    colour_g_min = colour_g_min_new;
+    colour_g_max = colour_g_max_new;
+    colour_b_min = colour_b_min_new;
+    colour_b_max = colour_b_max_new;
 
     should_update = false;
     ROS_INFO_STREAM("Updated params correcty!");
@@ -402,6 +415,12 @@ void dynamic_recongifure_callback(
     colour_filtering_new = config.colour_filtering;
     publish_planes_new = config.publish_planes;
     publish_outliers_new = config.publish_outliers;
+    colour_r_min_new = config.colour_r_min;
+    colour_r_max_new = config.colour_r_max;
+    colour_g_min_new = config.colour_g_min;
+    colour_g_max_new = config.colour_g_max;
+    colour_b_min_new = config.colour_b_min;
+    colour_b_max_new = config.colour_b_max;
 
     // Indicate new params need to be read
     should_update_params = true;
@@ -470,6 +489,7 @@ int main(int argc, char** argv) {
 
     ros::Rate r(30);
     while (ros::ok() && !pclViewer->wasStopped()) {
+        ros::spinOnce();
         update_params(should_update_params);
         if (request_pointcloud) {
             ROS_INFO_STREAM("Processing new pointcloud");
@@ -477,7 +497,6 @@ int main(int argc, char** argv) {
             request_pointcloud = false;
         }
         pclViewer->spinOnce(100);
-        ros::spinOnce();
         r.sleep();
     }
     return 0;
