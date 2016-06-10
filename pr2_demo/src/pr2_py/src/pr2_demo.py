@@ -243,54 +243,12 @@ def pick_n_place():
             poses = get_manip_pose('ros_hydro', markerArray_pub)
             rospy.sleep(0.05)
 
-            # pose_goal = pose_from_vector3D((0.31,0,-0.07,-1,0,0))
-            #
-            # box_marker = create_marker(Marker.ARROW,[.2,.01,.01],
-            #                            frame = 'ros_hydro', ns = 'arrow',
-            #                           pos =(pose_goal.position.x,
-            #                                 pose_goal.position.y,
-            #                                 pose_goal.position.z),
-            #                           color = (0,0.9, 1.0),
-            #                           quat = (pose_goal.orientation.x,
-            #                                   pose_goal.orientation.y,
-            #                                   pose_goal.orientation.z,
-            #                                   pose_goal.orientation.w))
-            # box_marker.color.a = 1
-            #
-            # # rospy.loginfo(trans_vec)
-            #
-            # marker_pub.publish(box_marker)
-            #
-            #
-            # p = PoseStamped()
-            # p.header = box_marker.header
             # p.pose = box_marker.pose
             # r_goal = tf2_geometry_msgs.do_transform_pose(p,trans)
             # rospy.loginfo("================Transformed Pose=========================")
             # rospy.loginfo(r_goal)
             #
             #
-            # # Left Arm
-            # pose_goal = pose_from_vector3D((-0.32,0,-0.07,1,0,0))
-            #
-            # box_marker = create_marker(Marker.ARROW,[.2,.01,.01],
-            #                            frame = 'ros_hydro', ns = 'arrow',
-            #                           pos =(pose_goal.position.x,
-            #                                 pose_goal.position.y,
-            #                                 pose_goal.position.z),
-            #                           color = (0,0.5, 1.0),
-            #                           quat = (pose_goal.orientation.x,
-            #                                   pose_goal.orientation.y,
-            #                                   pose_goal.orientation.z,
-            #                                   pose_goal.orientation.w))
-            # box_marker.color.a = 1
-            #
-            # # rospy.loginfo(trans_vec)
-            #
-            # marker_pub.publish(box_marker)
-            #
-            #
-            # p.header = box_marker.header
             # p.pose = box_marker.pose
             # l_goal = tf2_geometry_msgs.do_transform_pose(p,trans)
             # rospy.loginfo("================Transformed Pose=========================")
@@ -306,47 +264,6 @@ def pick_n_place():
             # dual_arm.go(wait=True)
             # rospy.sleep(2)
 
-            # look_at = tfBuffer.lookup_transform(
-            #     'r_wrist_roll_link',
-            #     'ros_hydro',
-            #     rospy.Time(0))
-            # look_at = trans
-            # # orient_target = geometry_msgs.msg.Pose()
-            # quat = (
-            #     look_at.transform.rotation.x,
-            #     look_at.transform.rotation.y,
-            #     look_at.transform.rotation.z,
-            #     look_at.transform.rotation.w)
-            # eular = tf.transformations.euler_from_quaternion(quat)
-            # rospy.loginfo(eular)
-            #
-            # pose_target = geometry_msgs.msg.Pose()
-            # orient_target = tf.transformations.quaternion_from_euler(
-            #     eular[0],
-            #     eular[1],
-            #     eular[2]
-            #     )
-            # pose_target.orientation.x = orient_target[0]
-            # pose_target.orientation.y = orient_target[1]
-            # pose_target.orientation.z = orient_target[2]
-            # pose_target.orientation.w = orient_target[3]
-            # pose_target.position.x = 0.5 # trans.transform.translation.x - 0.21
-            # pose_target.position.y = 0.0 # trans.transform.translation.y
-            # pose_target.position.z = 0.9 #trans.transform.translation.z
-            #
-            # lookat = (trans.transform.translation.x - 0.5,
-            #           trans.transform.translation.y - 0.0,
-            #           trans.transform.translation.z - 0.9)
-            # rospy.loginfo("New directions to look at")
-            # rospy.loginfo(lookat)
-            #
-            #
-            # rot_vec = qv_mult(orient_target,(1,0,0)) # Rotate vector by quaternion
-            # rospy.loginfo(rot_vec)
-            # pose_target = pose_from_vector3D((0.5,0.0,0.9,
-            #                                   lookat[0],lookat[1],lookat[2]))
-            #
-            #
             # constraints = Constraints()
             # constraints.name = "Gripper Control"
             #
@@ -378,27 +295,6 @@ def pick_n_place():
             # # Set the path constraints on the right_arm
             # right_arm.set_path_constraints(constraints)
 
-            # rospy.loginfo('Checkin Euler now')
-            # rospy.loginfo(orient_target)
-
-            # right_arm.set_start_state_to_current_state()
-            # right_arm.set_pose_target(pose_target)
-            # right_arm.allow_looking(True)
-
-            # right_arm.set_position_target([0.7,-0.6,1])
-            # right_arm.set_rpy_target([0,-1,0])
-            # right_arm.set_goal_orientation_tolerance(0.1)
-            # right_arm.set_rpy_target(eular, 'r_wrist_roll_link')
-            # right_arm.allow_replanning(True)
-            # rospy.loginfo(pose_target)
-
-            # right_arm.set_goal_tolerance(0.1)
-            #
-            # plan1 = right_arm.plan()
-            # # rospy.sleep(2)
-            #
-            # right_arm.go(wait=True)
-            # # rospy.sleep(2)
 
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException,
                 tf2_ros.ExtrapolationException):
