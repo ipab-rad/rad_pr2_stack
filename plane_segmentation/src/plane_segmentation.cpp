@@ -16,6 +16,10 @@
 #include <pcl_conversions/pcl_conversions.h>
 #include <pcl/ros/conversions.h>
 
+#include <pcl/common/distances.h>
+#include <pcl/common/common.h>
+#include <pcl/common/centroid.h>
+#include <pcl/common/transforms.h>
 #include <pcl/sample_consensus/model_types.h>
 #include <pcl/sample_consensus/method_types.h>
 #include <pcl/surface/convex_hull.h>
@@ -35,6 +39,8 @@
 #include <pcl/visualization/cloud_viewer.h>
 #include <pcl/io/pcd_io.h>
 #include <vtkRenderWindow.h>
+
+#include <Eigen/Dense>
 
 // Colour params
 unsigned char colour_r_min;
@@ -119,6 +125,15 @@ void updatePCLViewer() {
         pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "segmented cloud");
     pclViewer->setPointCloudRenderingProperties(
         pcl::visualization::PCL_VISUALIZER_POINT_SIZE, 1, "outliers cloud");
+}
+
+double mean_to_point_dist(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr
+                          cloud, pcl::PointIndices& idxs, Eigen::Vector4f point) {
+    Eigen::Vector4f centroid;
+    if (pcl::compute3DCentroid(*cloud, idxs, centroid) != idxs.indices.size()) {
+        ROS_WARN_STREAM("Cannot find centre of cluster");
+    }
+    return (centroid - point).norm();
 }
 
 void update_params(bool& should_update) {
@@ -410,11 +425,27 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
             ec.setSearchMethod(tree);
             ec.setInputCloud(objects);
             ec.extract(cluster_indices);
+            ROS_INFO_STREAM("Found " << cluster_indices.size() << " clusters.");
+            ROS_INFO(">> CPU Time euclidean clustering: %.2fms",
+                     (double)(clock() - tStart) / CLOCKS_PER_SEC * 1000);
 
             // Get a cluster
+            tStart = clock();
+
+            Eigen::Vector4f master_point(0.0, 0.0, 1.0, 1);
+            double min_dist = DBL_MAX;
+            int min_idx = 0;
+            for (int i = 0; i < cluster_indices.size(); ++i) {
+                double dist = mean_to_point_dist(objects, cluster_indices[i], master_point);
+                if (dist < min_dist) {
+                    min_dist = dist;
+                    min_idx = i;
+                }
+            }
+
             pcl::PointCloud<pcl::PointXYZRGB>::Ptr cobj(new
                                                         pcl::PointCloud<pcl::PointXYZRGB>);
-            pcl::PointIndices::Ptr idxs(new pcl::PointIndices(cluster_indices[0]));
+            pcl::PointIndices::Ptr idxs(new pcl::PointIndices(cluster_indices[min_idx]));
             extract.setInputCloud(objects);
             extract.setIndices(idxs);
             extract.setNegative(false);
@@ -422,9 +453,8 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
             sensor_msgs::PointCloud2 segm_obj;
             pcl::toROSMsg(*cobj, segm_obj);
             cluster_pub.publish(segm_obj);
-            ROS_INFO(">> CPU Time euclidean clustering: %.2fms",
+            ROS_INFO(">> CPU Time cluster selection and publishing: %.2fms",
                      (double)(clock() - tStart) / CLOCKS_PER_SEC * 1000);
-            ROS_INFO_STREAM("Found " << cluster_indices.size() << " clusters.");
         }
 
         s_ros = ros::Time::now();
