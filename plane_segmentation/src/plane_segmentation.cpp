@@ -5,6 +5,8 @@
 *      @desc: Segmenting a plane from a pointcloud and publishing any resulting clouds
 */
 
+#include <cstddef>
+
 #include <ros/ros.h>
 #include <sensor_msgs/PointCloud2.h>
 #include <std_srvs/Empty.h>
@@ -338,7 +340,7 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
 
         }
 
-        if (colour_filtering) {
+        if (colour_filtering && objects->size() > 0) {
             s_ros = ros::Time::now();
             pcl::ConditionAnd<pcl::PointXYZRGB>::Ptr range_cond(
                 new pcl::ConditionAnd<pcl::PointXYZRGB>());
@@ -381,7 +383,7 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
                      (e_ros - s_ros).toNSec() * 1e-6);
         }
 
-        if (postfiltering_segmented != -1) {
+        if (postfiltering_segmented != -1 && objects->size() > 0) {
             // Post filtering
             s_ros = ros::Time::now();
             // Remove singled out points
@@ -409,7 +411,7 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
             ROS_INFO(">> CPU Time postfiltering: %.2fms.", (e_ros - s_ros).toNSec() * 1e-6);
         }
 
-        if (euclidean_clustering) {
+        if (euclidean_clustering && objects->size() > 0) {
             clock_t tStart = clock();
             // Creating the KdTree object for the search method of the extraction
             pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree (new
@@ -429,32 +431,33 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
             ROS_INFO(">> CPU Time euclidean clustering: %.2fms",
                      (double)(clock() - tStart) / CLOCKS_PER_SEC * 1000);
 
-            // Get a cluster
-            tStart = clock();
-
-            Eigen::Vector4f master_point(0.0, 0.0, 1.0, 1);
-            double min_dist = DBL_MAX;
-            int min_idx = 0;
-            for (int i = 0; i < cluster_indices.size(); ++i) {
-                double dist = mean_to_point_dist(objects, cluster_indices[i], master_point);
-                if (dist < min_dist) {
-                    min_dist = dist;
-                    min_idx = i;
+            if (cluster_indices.size() > 0) {
+                // Get a cluster
+                tStart = clock();
+                Eigen::Vector4f master_point(0.0, 0.20, 1.0, 1);
+                double min_dist = DBL_MAX;
+                int min_idx = 0;
+                for (int i = 0; i < cluster_indices.size(); ++i) {
+                    double dist = mean_to_point_dist(objects, cluster_indices[i], master_point);
+                    if (dist < min_dist) {
+                        min_dist = dist;
+                        min_idx = i;
+                    }
                 }
-            }
 
-            pcl::PointCloud<pcl::PointXYZRGB>::Ptr cobj(new
-                                                        pcl::PointCloud<pcl::PointXYZRGB>);
-            pcl::PointIndices::Ptr idxs(new pcl::PointIndices(cluster_indices[min_idx]));
-            extract.setInputCloud(objects);
-            extract.setIndices(idxs);
-            extract.setNegative(false);
-            extract.filter(*cobj);
-            sensor_msgs::PointCloud2 segm_obj;
-            pcl::toROSMsg(*cobj, segm_obj);
-            cluster_pub.publish(segm_obj);
-            ROS_INFO(">> CPU Time cluster selection and publishing: %.2fms",
-                     (double)(clock() - tStart) / CLOCKS_PER_SEC * 1000);
+                pcl::PointCloud<pcl::PointXYZRGB>::Ptr cobj(new
+                                                            pcl::PointCloud<pcl::PointXYZRGB>);
+                pcl::PointIndices::Ptr idxs(new pcl::PointIndices(cluster_indices[min_idx]));
+                extract.setInputCloud(objects);
+                extract.setIndices(idxs);
+                extract.setNegative(false);
+                extract.filter(*cobj);
+                sensor_msgs::PointCloud2 segm_obj;
+                pcl::toROSMsg(*cobj, segm_obj);
+                cluster_pub.publish(segm_obj);
+                ROS_INFO(">> CPU Time cluster selection and publishing: %.2fms",
+                         (double)(clock() - tStart) / CLOCKS_PER_SEC * 1000);
+            }
         }
 
         s_ros = ros::Time::now();
@@ -579,6 +582,7 @@ void dynamic_recongifure_callback(
 bool request_pointcloud_callback(
     std_srvs::Empty::Request&  req,
     std_srvs::Empty::Response& res) {
+    ROS_INFO_STREAM("Received a request for processing!");
     request_pointcloud = true;
     return true;
 }
@@ -629,7 +633,7 @@ int main(int argc, char** argv) {
     while (ros::ok() && !pclViewer->wasStopped()) {
         ros::spinOnce();
         update_params(should_update_params);
-        if (request_pointcloud) {
+        if (request_pointcloud && pc_msg != nullptr) {
             ROS_INFO_STREAM("Processing new pointcloud");
             new_cloud_2_process(pc_msg);
             request_pointcloud = false;
