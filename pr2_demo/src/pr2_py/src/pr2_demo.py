@@ -15,7 +15,7 @@ import std_msgs
 # from scipy import linalg
 from numpy import *
 from geometry_msgs.msg import (PoseStamped, Pose, PoseArray,
-                               Vector3, Quaternion)
+                               Vector3, Quaternion, Point)
 from moveit_msgs.msg import (VisibilityConstraint, Constraints,
                              OrientationConstraint, PositionConstraint,
                              Grasp, GripperTranslation)
@@ -125,47 +125,79 @@ def add_scene_object(name = 'ros_hydro', obj_type = 'box',
         sc.add_box(name,pose,size)
 
 
-def get_manip_pose(obj, pub):
+def get_manip_pose(obj, pub, dim, grip_len = 0.21):
     marker_array = MarkerArray()
     poses = PoseArray()
     poses.header.frame_id = obj
     poses.header.stamp = rospy.Time(0)
 
-    grip_len = 0.21
+    # grip_len = 0.21
     col = (0.3, 0.1, 0.0)
 
+    # Pointing towards the origin
+    Right = (-1.,0.,0.)
+    Left = (1.,0.,0.)
+    Top = (0.,-1.,0.)
+    Bottom = (0.,1.,0.)
+    Top_Right = (-1.,-1.,0.)
+    Bottom_Left =(1.,1.,0.)
+    Top_Left = (1.,-1.,0.)
+    Bottom_Right =(-1.,1.,0.)
+    Z_C_P = (0.,0.,-1.)
+    Z_C_N = (0.,0.,1.)
 
-    for i in range(1,11):
+    # TODO: Add option for when gripper does need to face object (i.e. grip_len = 0)
+    C_R_Pos = ((dim[0]/2) + grip_len, 0, 0)
+    C_L_Pos = (-((dim[0]/2) + grip_len), 0, 0)
+    C_T_Pos = (0, (dim[1]/2) + grip_len, 0)
+    C_B_Pos = (0, -((dim[1]/2) + grip_len), 0)
+    C_Z_F_Pos = (0,0,((dim[2]/2) + grip_len))
+    C_Z_B_Pos = (0,0,-((dim[2]/2) + grip_len))
+
+
+    # rospy.loginfo(C_R_Pos + Right)
+    # rospy.loginfo(C_L_Pos + Left)
+
+    for i in range(1,3):
         if i == 1:
-            pose_target = pose_from_vector3D ((0.31,0,-0.07,-1,0,0))
-            rospy.loginfo("Right-X")
+            pose_target = pose_from_vector3D((C_R_Pos + Right))
+            # rospy.loginfo("Right-X")
         elif i == 2:
-            pose_target = pose_from_vector3D((-0.32,0,-0.07,1,0,0))
-            rospy.loginfo("Left-X")
-        elif i == 3:
-            pose_target = pose_from_vector3D ((0,0.36,-0.07,0,-1,0))
-            rospy.loginfo("Right-Y")
-        elif i == 4:
-            pose_target = pose_from_vector3D((0,-0.36,-0.07,0,1,0))
-            rospy.loginfo("Left-Y")
-        elif i == 5:
-            pose_target = pose_from_vector3D ((0.31,0.34,-0.07,-1,-1,0))
-            rospy.loginfo("Top-Right-Diag")
-        elif i == 6:
-            pose_target = pose_from_vector3D((-0.32,-0.34,-0.07,1,1,0))
-            rospy.loginfo("Bottom-Left-Diag")
-        elif i == 7:
-            pose_target = pose_from_vector3D ((-0.32,0.34,-0.07,1,-1,0))
-            rospy.loginfo("Top-Left-Diag")
-        elif i == 8:
-            pose_target = pose_from_vector3D((0.31,-0.34,-0.07,-1,1,0))
-            rospy.loginfo("Bottom-Right-Diag")
-        elif i == 9:
-            pose_target = pose_from_vector3D ((0,0,0.2,0,0,-1))
-            rospy.loginfo("Z-Center-Pos")
-        elif i == 10:
-            pose_target = pose_from_vector3D((0,0,-0.2,0,0,1))
-            rospy.loginfo("Z-Center-Neg")
+            pose_target = pose_from_vector3D((C_L_Pos + Left))
+            # rospy.loginfo("Left-X")
+        else:
+            rospy.loginfo("Error in manip loop")
+
+        # if i == 1:
+        #     pose_target = pose_from_vector3D ((0.31,0,-0.07,-1,0,0))
+        #     rospy.loginfo("Right-X")
+        # elif i == 2:
+        #     pose_target = pose_from_vector3D((-0.32,0,-0.07,1,0,0))
+        #     rospy.loginfo("Left-X")
+        # elif i == 3:
+        #     pose_target = pose_from_vector3D ((0,0.36,-0.07,0,-1,0))
+        #     rospy.loginfo("Right-Y")
+        # elif i == 4:
+        #     pose_target = pose_from_vector3D((0,-0.36,-0.07,0,1,0))
+        #     rospy.loginfo("Left-Y")
+        # elif i == 5:
+        #     pose_target = pose_from_vector3D ((0.31,0.34,-0.07,-1,-1,0))
+        #     rospy.loginfo("Top-Right-Diag")
+        # elif i == 6:
+        #     pose_target = pose_from_vector3D((-0.32,-0.34,-0.07,1,1,0))
+        #     rospy.loginfo("Bottom-Left-Diag")
+        # elif i == 7:
+        #     pose_target = pose_from_vector3D ((-0.32,0.34,-0.07,1,-1,0))
+        #     rospy.loginfo("Top-Left-Diag")
+        # elif i == 8:
+        #     pose_target = pose_from_vector3D((0.31,-0.34,-0.07,-1,1,0))
+        #     rospy.loginfo("Bottom-Right-Diag")
+        # elif i == 9:
+        #     pose_target = pose_from_vector3D ((0,0,0.2,0,0,-1))
+        #     rospy.loginfo("Z-Center-Pos")
+        # elif i == 10:
+        #     pose_target = pose_from_vector3D((0,0,-0.2,0,0,1))
+        #     rospy.loginfo("Z-Center-Neg")
 
         if i % 2 == 0:
             col = [x + 0.2 for x in col]
@@ -179,7 +211,7 @@ def get_manip_pose(obj, pub):
 
     pub.publish(marker_array)
 
-    rospy.loginfo(len(marker_array.markers))
+    # rospy.loginfo(len(marker_array.markers))
 
 
     return poses
@@ -199,6 +231,9 @@ def pick_n_place():
     scene = moveit_commander.PlanningSceneInterface()
 
     dual_arm = moveit_commander.MoveGroupCommander("arms");
+
+    r_gripper = moveit_commander.MoveGroupCommander('right_gripper')
+    l_gripper = moveit_commander.MoveGroupCommander('left_gripper')
 
     dual_arm.set_planner_id('RRTConnectkConfigDefault')
 
@@ -238,31 +273,43 @@ def pick_n_place():
             # rospy.loginfo(pose_target)
 
             # scene.add_box('ros_hydro', pose_target, (0.2,0.28,0.01) )
+            p = PoseStamped()
+            p.header.frame_id = 'odom_combined'
+            p.pose.position = Point(0.13,1.9, 0.44)
+            p.pose.orientation.w = 1.0
+            scene.add_box('Table', p, (1.2,1.2,0.7))
 
-            rospy.loginfo("test print")
-            poses = get_manip_pose('ros_hydro', markerArray_pub)
-            rospy.sleep(0.05)
+            # rospy.loginfo("test print")
+            pose_array = get_manip_pose('ros_hydro', markerArray_pub, (0.23, 0.28,
+                                                                  0.03))
 
-            # p.pose = box_marker.pose
-            # r_goal = tf2_geometry_msgs.do_transform_pose(p,trans)
-            # rospy.loginfo("================Transformed Pose=========================")
-            # rospy.loginfo(r_goal)
-            #
-            #
-            # p.pose = box_marker.pose
-            # l_goal = tf2_geometry_msgs.do_transform_pose(p,trans)
-            # rospy.loginfo("================Transformed Pose=========================")
-            # rospy.loginfo(l_goal)
-            #
-            # dual_arm.set_goal_tolerance(0.01)
-            # dual_arm.allow_replanning(True)
-            # dual_arm.set_pose_target(r_goal, 'r_wrist_roll_link')
-            # dual_arm.set_pose_target(l_goal, 'l_wrist_roll_link')
-            # dual_arm.set_start_state_to_current_state()
+            p = PoseStamped()
+            p.header = pose_array.header
+
+            p.pose = pose_array.poses[0]
+            p.pose.position.z -= 0.018
+            p.pose.position.x -= 0.03
+            r_goal = tf2_geometry_msgs.do_transform_pose(p,trans)
+
+
+            p.pose = pose_array.poses[1]
+            p.pose.position.z -= 0.025
+            p.pose.position.x += 0.005
+            l_goal = tf2_geometry_msgs.do_transform_pose(p,trans)
+
+            dual_arm.set_goal_tolerance(0.01)
+            dual_arm.allow_replanning(True)
+            dual_arm.set_pose_target(r_goal, 'r_wrist_roll_link')
+            dual_arm.set_pose_target(l_goal, 'l_wrist_roll_link')
+            dual_arm.set_start_state_to_current_state()
             # dual_arm.plan()
-            # rospy.sleep(2)
+            l_gripper.set_start_state_to_current_state()
+            l_gripper.set_joint_value_target((0.03))
+            l_gripper.plan()
+            rospy.sleep(5)
+            l_gripper.go(wait=True)
             # dual_arm.go(wait=True)
-            # rospy.sleep(2)
+            # rospy.sleep(8)
 
             # constraints = Constraints()
             # constraints.name = "Gripper Control"
