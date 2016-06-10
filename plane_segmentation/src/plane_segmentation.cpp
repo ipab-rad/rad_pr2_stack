@@ -91,6 +91,7 @@ bool request_pointcloud = false;
 ros::Publisher plane_pub;
 ros::Publisher outlier_pub;
 ros::Publisher segmented_pub;
+ros::Publisher cluster_pub;
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_p(
     new pcl::PointCloud<pcl::PointXYZRGB>),
         cloud(new pcl::PointCloud<pcl::PointXYZRGB>),
@@ -394,28 +395,36 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
         }
 
         if (euclidean_clustering) {
-            // clock_t tStart = clock();
-            // // Creating the KdTree object for the search method of the extraction
-            // pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree (new
-            //                                                  pcl::search::KdTree<pcl::PointXYZRGB>);
-            // tree->setInputCloud(objects);
+            clock_t tStart = clock();
+            // Creating the KdTree object for the search method of the extraction
+            pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree (new
+                                                             pcl::search::KdTree<pcl::PointXYZRGB>);
+            tree->setInputCloud(objects);
 
-            // std::vector<pcl::PointIndices> cluster_indices;
-            // pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> ec;
-            // ec.setClusterTolerance(0.02); // 2cm
-            // ec.setMinClusterSize(100);
-            // ec.setMaxClusterSize(25000);
-            // ec.setSearchMethod(tree);
-            // ec.setInputCloud(objects);
-            // ec.extract(cluster_indices);
+            std::vector<pcl::PointIndices> cluster_indices;
+            pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> ec;
+            // TODO: Extract the numbers as dynamic param
+            ec.setClusterTolerance(0.02); // 2cm
+            ec.setMinClusterSize(100);
+            ec.setMaxClusterSize(25000);
+            ec.setSearchMethod(tree);
+            ec.setInputCloud(objects);
+            ec.extract(cluster_indices);
 
-            // ROS_INFO(">> CPU Time euclidean clustering: %.2fms",
-            //          (double)(clock() - tStart) / CLOCKS_PER_SEC * 1000);
-            // ROS_INFO_STREAM("Found " << cluster_indices.size() << " clusters.");
-            /*
-            std::vector<int> ivec;
-            std::iota(ivec.begin(), ivec.end(), 0); // 0, 1, 2, 3, 4 ...
-            */
+            // Get a cluster
+            pcl::PointCloud<pcl::PointXYZRGB>::Ptr cobj(new
+                                                        pcl::PointCloud<pcl::PointXYZRGB>);
+            pcl::PointIndices::Ptr idxs(new pcl::PointIndices(cluster_indices[0]));
+            extract.setInputCloud(objects);
+            extract.setIndices(idxs);
+            extract.setNegative(false);
+            extract.filter(*cobj);
+            sensor_msgs::PointCloud2 segm_obj;
+            pcl::toROSMsg(*cobj, segm_obj);
+            cluster_pub.publish(segm_obj);
+            ROS_INFO(">> CPU Time euclidean clustering: %.2fms",
+                     (double)(clock() - tStart) / CLOCKS_PER_SEC * 1000);
+            ROS_INFO_STREAM("Found " << cluster_indices.size() << " clusters.");
         }
 
         s_ros = ros::Time::now();
@@ -573,6 +582,7 @@ int main(int argc, char** argv) {
     outlier_pub = nh.advertise<sensor_msgs::PointCloud2>("extracted_outliers", 1);
     segmented_pub =
         nh.advertise<sensor_msgs::PointCloud2>("segmented_objects_above", 1);
+    cluster_pub = nh.advertise<sensor_msgs::PointCloud2>("clustered_object", 1);
     ros::ServiceServer request_pointcloud_service =
         nh.advertiseService("request_pointcloud",
                             request_pointcloud_callback);
