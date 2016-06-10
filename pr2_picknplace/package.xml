@@ -21,6 +21,9 @@
   <build_depend>moveit_core</build_depend>
   <build_depend>moveit_ros_planning_interface</build_depend>
   <build_depend>moveit_ros_perception</build_depend>
+  <build_depend>pr2_gripper_sensor_action</build_depend>
+  <build_depend>pr2_gripper_sensor_controller</build_depend>
+  <build_depend>pr2_gripper_sensor_msgs</build_depend>
 
   <run_depend>actionlib</run_depend>
   <run_depend>tf2_ros</run_depend>
@@ -34,6 +37,9 @@
   <run_depend>moveit_core</run_depend>
   <run_depend>moveit_ros_planning_interface</run_depend>
   <run_depend>moveit_ros_perception</run_depend>
+  <run_depend>pr2_gripper_sensor_action</run_depend>
+  <run_depend>pr2_gripper_sensor_controller</run_depend>
+  <run_depend>pr2_gripper_sensor_msgs</run_depend>
 
   <export>
 

@@ -26,10 +26,14 @@ PickPlaceAction::PickPlaceAction(ros::NodeHandle& nh, std::string name,
     wrist_roll_link = "r_wrist_roll_link";
     gripper_controller = "r_gripper_controller/gripper_action";
     gripper_tool_frame = "r_gripper_tool_frame";
+    sensor_gripper_controller_grab = "r_gripper_sensor_controller/grab";
+    sensor_gripper_controller_release = "r_gripper_sensor_controller/release";
   } else if (arm == "left_arm") {
     wrist_roll_link = "l_wrist_roll_link";
     gripper_controller = "l_gripper_controller/gripper_action";
     gripper_tool_frame = "l_gripper_tool_frame";
+    sensor_gripper_controller_grab = "l_gripper_sensor_controller/grab";
+    sensor_gripper_controller_release = "l_gripper_sensor_controller/release";
   } else {
     ROS_ERROR_STREAM("Wrong parameter 'arm'. Given: '" << arm
                      << "' was expecting 'left_arm' or 'right_arm'.");
@@ -39,7 +43,6 @@ PickPlaceAction::PickPlaceAction(ros::NodeHandle& nh, std::string name,
   this->loadParams();
   this->init();
   this->rosSetup();
-
 
   std::vector<std::string> js = move_group_arm.getJoints();
   for (size_t i = 0; i < js.size(); ++i) {
@@ -72,16 +75,22 @@ void PickPlaceAction::loadParams() {
   ros::param::param(ns_ + "/open_gripper_pos", open_gripper_pos_, 0.08);
   ros::param::param(ns_ + "/close_gripper_pos", close_gripper_pos_, 0.00);
   ros::param::param(ns_ + "/close_effort", close_effort_, 50.0);
+  ros::param::param(ns_ + "/use_touch_pads", use_touch_pads, true);
+
   ROS_INFO_STREAM("Planning time: " << max_planning_time <<
                   ", Adding table: " << (add_table_ ? "True" : "False") <<
                   ", OpenGripperPos: " << open_gripper_pos_ <<
                   ", CloseGripperPos: " << close_gripper_pos_ <<
-                  ", CloseEffort: " << close_effort_);
+                  ", CloseEffort: " << close_effort_ <<
+                  ", use_touch_pads: " << use_touch_pads);
 }
 
 void PickPlaceAction::init() {
   co_wait_ = 0.5f;
   exec_wait_ = 0.0f;
+
+  sensor_grabbing = false;
+  sensor_releasing = false;
 }
 
 void PickPlaceAction::rosSetup() {
@@ -105,13 +114,26 @@ void PickPlaceAction::rosSetup() {
   ROS_INFO_STREAM("[PICKPLACEACTION] Current " <<
                   move_group_arm.getCurrentPose().pose);
 
-  gripper_client_ = new
-  actionlib::SimpleActionClient<pr2_controllers_msgs::Pr2GripperCommandAction>(
-    gripper_controller, true);
-
-  // Wait for the gripper action server to come up
-  while (!gripper_client_->waitForServer(ros::Duration(5.0))) {
-    ROS_INFO("Waiting for the gripper action server to come up");
+  if (use_touch_pads) {
+    grab_client_  =
+      new SensorGrabClient(sensor_gripper_controller_grab, true);
+    release_client_  =
+      new SensorReleaseClient(sensor_gripper_controller_release, true);
+    // Wait for the servers to come up
+    while (!grab_client_->waitForServer(ros::Duration(5.0))) {
+      ROS_INFO("Waiting for the r/l_gripper_sensor_controller/grab action server to come up");
+    }
+    while (!release_client_->waitForServer(ros::Duration(5.0))) {
+      ROS_INFO("Waiting for the r/l_gripper_sensor_controller/release action server to come up");
+    }
+  } else {
+    gripper_client_ = new
+    actionlib::SimpleActionClient<pr2_controllers_msgs::Pr2GripperCommandAction>(
+      gripper_controller, true);
+    // Wait for the gripper action server to come up
+    while (!gripper_client_->waitForServer(ros::Duration(5.0))) {
+      ROS_INFO("Waiting for the gripper action server to come up");
+    }
   }
 
   deleteObject("cube");
@@ -121,7 +143,7 @@ void PickPlaceAction::rosSetup() {
 void PickPlaceAction::goalCB() {
   pick_place_goal_ = as_.acceptNewGoal()->goal;
   ROS_INFO_STREAM("[PICKPLACEACTION] Received a goal for" <<
-                  pick_place_goal_.request  << " - " <<
+                  int(pick_place_goal_.request)  << " - " <<
                   pick_place_goal_.object_pose);
   this->executeCB();
 }
@@ -302,11 +324,11 @@ bool PickPlaceAction::PickCube(geometry_msgs::PoseStamped ps) {
   ROS_DEBUG_STREAM("Grasp " << p);
   ROS_DEBUG_STREAM("Postgrasp " << postgrasp_pose);
 
-  moveit::core::RobotState pregrasp_robot_state = RobotStateFromPose(
-                                                    pregrasp_pose);
+  moveit::core::RobotState pregrasp_robot_state =
+    RobotStateFromPose(pregrasp_pose);
   moveit::core::RobotState grasp_robot_state = RobotStateFromPose(p);
-  moveit::core::RobotState postgrasp_robot_state = RobotStateFromPose(
-                                                     postgrasp_pose);
+  moveit::core::RobotState postgrasp_robot_state =
+    RobotStateFromPose(postgrasp_pose);
 
   bool success = Plan(*move_group_arm.getCurrentState(),
                       pregrasp_robot_state,
@@ -323,7 +345,11 @@ bool PickPlaceAction::PickCube(geometry_msgs::PoseStamped ps) {
 
   if (success) {
     ROS_INFO_STREAM("[PICKPLACEACTION] Executing on the robot ...");
-    SendGripperCommand(open_gripper_pos_);
+    if (use_touch_pads) {
+      SensorRelease();
+    } else {
+      SendGripperCommand(open_gripper_pos_);
+    }
 
     success = move_group_arm.execute(pregrasp_plan);
     ros::WallDuration(exec_wait_).sleep();
@@ -333,7 +359,11 @@ bool PickPlaceAction::PickCube(geometry_msgs::PoseStamped ps) {
     if (success) { success &= move_group_arm.execute(grasp_plan); }
     ros::WallDuration(exec_wait_).sleep();
 
-    SendGripperCommand(close_gripper_pos_, close_effort_);
+    if (use_touch_pads) {
+      SensorGrab();
+    } else {
+      SendGripperCommand(close_gripper_pos_, close_effort_);
+    }
 
     if (success) { success &= CheckGripperFinished(); }
 
@@ -443,7 +473,11 @@ bool PickPlaceAction::PlaceCube(geometry_msgs::PoseStamped ps) {
     if (success) { success &= move_group_arm.execute(place_plan); }
     ros::WallDuration(exec_wait_).sleep();
 
-    SendGripperCommand(open_gripper_pos_);
+    if (use_touch_pads) {
+      SensorRelease();
+    } else {
+      SendGripperCommand(open_gripper_pos_);
+    }
 
     if (success) { success &= CheckGripperFinished(); }
 
@@ -454,6 +488,7 @@ bool PickPlaceAction::PlaceCube(geometry_msgs::PoseStamped ps) {
     ROS_INFO_STREAM("[PICKPLACEACTION] Failed to find a plan for pose: "
                     << pick_place_goal_.object_pose);
   }
+
   return success;
 }
 
@@ -499,22 +534,84 @@ moveit::core::RobotState PickPlaceAction::RobotStateFromPose(
 }
 
 void PickPlaceAction::SendGripperCommand(float position, float max_effort) {
+  if (use_touch_pads) {
+    ROS_ERROR("I am sending gripper commands to standard gripper.");
+  }
   pr2_controllers_msgs::Pr2GripperCommandGoal cm;
   cm.command.position = position;
   cm.command.max_effort = max_effort;
-  ROS_INFO("Sending gripper command");
+  ROS_INFO("Sending standard gripper command");
   gripper_client_->sendGoal(cm);
 }
 
 bool PickPlaceAction::CheckGripperFinished() {
-  gripper_client_->waitForResult(ros::Duration(max_planning_time));
-  if (gripper_client_->getState() ==
-      actionlib::SimpleClientGoalState::SUCCEEDED) {
-    return true;
+  if (use_touch_pads) {
+    // Use touch sensing fingers
+    if (sensor_grabbing) {
+      sensor_grabbing = false;
+      grab_client_->waitForResult(ros::Duration(max_planning_time));
+      if (grab_client_->getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
+        ROS_INFO("Successfully completed Grab");
+        return true;
+      } else {
+        ROS_INFO("Grab Failed");
+        return false;
+      }
+    } else if (sensor_releasing) {
+      sensor_releasing = false;
+      release_client_->waitForResult(ros::Duration(max_planning_time));
+      if (release_client_->getState() ==
+          actionlib::SimpleClientGoalState::SUCCEEDED) {
+        ROS_INFO("Release Success");
+        return true;
+      } else {
+        ROS_INFO("Place Failure");
+        return false;
+      }
+    } else {
+      ROS_WARN_STREAM("Wrong use_touch_pads when CheckGripperFinished." <<
+                      "Both sensor_grabbing: " << sensor_grabbing <<
+                      " and sensor_releasing: " << sensor_releasing);
+      return false;
+    }
   } else {
-    ROS_WARN("[PICKPLACEACTION] The gripper failed to open.");
-    return false;
+    // Use standard gripper
+    gripper_client_->waitForResult(ros::Duration(max_planning_time));
+    if (gripper_client_->getState() ==
+        actionlib::SimpleClientGoalState::SUCCEEDED) {
+      return true;
+    } else {
+      ROS_WARN("[PICKPLACEACTION] The gripper failed to open.");
+      return false;
+    }
   }
+}
+
+bool PickPlaceAction::SensorGrab() {
+  pr2_gripper_sensor_msgs::PR2GripperGrabGoal grip;
+  grip.command.hardness_gain = 0.03;
+
+  ROS_INFO("Sending grab goal");
+  grab_client_->sendGoal(grip);
+  sensor_grabbing = true;
+  return true;
+}
+
+bool PickPlaceAction::SensorRelease() {
+  pr2_gripper_sensor_msgs::PR2GripperReleaseGoal place;
+  // set the robot to release on a figner-side impact, fingerpad slip, or acceleration impact with hand/arm
+  place.command.event.trigger_conditions =
+    place.command.event.FINGER_SIDE_IMPACT_OR_SLIP_OR_ACC;
+  // set the acceleration impact to trigger on to 5 m/s^2
+  // If set to 0, will release instantaniously
+  place.command.event.acceleration_trigger_magnitude = 0.0;
+  // set our slip-gain to release on to .005
+  place.command.event.slip_trigger_magnitude = .01;
+
+  ROS_INFO("Waiting for object placement contact...");
+  release_client_->sendGoal(place);
+  sensor_releasing = true;
+  return true;
 }
 
 moveit_msgs::CollisionObject PickPlaceAction::deleteObject(

@@ -1,6 +1,17 @@
 arm: right_arm
 add_table: false
 max_planning_time: 10.0
+use_touch_pads: true
+
+# Simple gripper (if use_touch_pads = false)
 open_gripper_pos: 0.06
 close_gripper_pos: 0.01
 close_effort: 100.0
+
+# pr2_gripper_sensor_action params
+hardness_gain: 0.03
+close_speed: 0.02 # m/s
+fingertip_force_limit: -1 # N
+deformation_limit: 0.03 # m
+force_lightest: 1.2 # N
+position_open: 0.09 # m
