@@ -18,9 +18,10 @@
 
 #include <pcl/sample_consensus/model_types.h>
 #include <pcl/sample_consensus/method_types.h>
-#include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/surface/convex_hull.h>
+#include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/segmentation/extract_polygonal_prism_data.h>
+#include <pcl/segmentation/extract_clusters.h>
 
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/extract_indices.h>
@@ -63,6 +64,9 @@ float neighboring_filter_n_count;
 bool colour_filtering;
 bool publish_planes;
 bool publish_outliers;
+bool euclidean_clustering;
+int prefiltering;
+int postfiltering_segmented;
 
 // New params
 bool should_update_params = true;
@@ -78,6 +82,9 @@ float neighboring_filter_n_count_new;
 bool colour_filtering_new;
 bool publish_planes_new;
 bool publish_outliers_new;
+bool euclidean_clustering_new;
+int prefiltering_new;
+int postfiltering_segmented_new;
 
 // ROS vars
 bool request_pointcloud = false;
@@ -133,6 +140,9 @@ void update_params(bool& should_update) {
     colour_g_max = colour_g_max_new;
     colour_b_min = colour_b_min_new;
     colour_b_max = colour_b_max_new;
+    euclidean_clustering = euclidean_clustering_new;
+    prefiltering = prefiltering_new;
+    postfiltering_segmented = postfiltering_segmented_new;
 
     should_update = false;
     ROS_INFO_STREAM("Updated params correcty!");
@@ -146,7 +156,9 @@ void new_cloud_callback(const pcl::PCLPointCloud2::ConstPtr& msg) {
 }
 
 void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
-
+    ROS_INFO_STREAM("---");
+    ros::Time s_ros, e_ros, total_time;
+    total_time = ros::Time::now();
     // Convert the sensor_msgs/PointCloud2 data to pcl/PointCloud
     pcl::fromPCLPointCloud2(*msg, *cloud);
 
@@ -157,21 +169,34 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
     pcl::PCLPointCloud2 cloud_filtered;
     sor.filter(cloud_filtered);
 
-    // Create the filtering object
     pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered2(new
                                                            pcl::PointCloud<pcl::PointXYZRGB>);
     pcl::fromPCLPointCloud2(cloud_filtered, *cloud_filtered2);
+    e_ros = ros::Time::now();
+    ROS_INFO(">> CPU Time VoxelGrid: %.2fms.",
+             (e_ros - total_time).toNSec() * 1e-6);
 
     // Filter all
-    pcl::StatisticalOutlierRemoval<pcl::PointXYZRGB> fitlering_obj_all;
-    fitlering_obj_all.setInputCloud(cloud_filtered2);
-    fitlering_obj_all.setMeanK(100); // neighboring points to query
-    fitlering_obj_all.setStddevMulThresh(1.0); //std deviation
-    fitlering_obj_all.filter(*cloud_filtered2); // cloud_filtered
+    if (prefiltering != -1) {
+        s_ros = ros::Time::now();
+        // Create the filtering object
+        pcl::StatisticalOutlierRemoval<pcl::PointXYZRGB> fitlering_obj_all;
+        fitlering_obj_all.setInputCloud(cloud_filtered2);
+        fitlering_obj_all.setMeanK(prefiltering); // neighboring points to query
+        fitlering_obj_all.setStddevMulThresh(1.0); //std deviation
+        fitlering_obj_all.filter(*cloud_filtered2); // cloud_filtered
+
+        e_ros = ros::Time::now();
+        ROS_INFO(">> CPU Time all prefiltering: %.2fms.",
+                 (e_ros - s_ros).toNSec() * 1e-6);
+    }
+
 
     pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
     pcl::ExtractIndices<pcl::PointXYZRGB> extract;
     if (publish_planes || publish_outliers || segment_objects) {
+        s_ros = ros::Time::now();
+
         // Extract
         // Create the segmentation object
         pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients());
@@ -180,7 +205,7 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
         sacs_segm.setOptimizeCoefficients(true);
         sacs_segm.setModelType(pcl::SACMODEL_PLANE);
         sacs_segm.setMethodType(pcl::SAC_RANSAC);
-        sacs_segm.setMaxIterations(1000);
+        sacs_segm.setMaxIterations(1000); // TODO: export it as a parameter
         sacs_segm.setDistanceThreshold(plane_threshold_m); // 0.01m
         sacs_segm.setInputCloud(cloud_filtered2);
         sacs_segm.segment(*inliers, *coefficients);
@@ -188,7 +213,7 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
             ROS_WARN_STREAM("Could not estimate a planar model for the given dataset.");
             return;
         }
-        ROS_INFO_STREAM("Estimated a planar model!");
+        ROS_DEBUG_STREAM("Estimated a planar model!");
 
 
         // Extract the inliers
@@ -196,11 +221,17 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
         extract.setIndices(inliers);
         extract.setNegative(false);
         extract.filter(*cloud_p);
-        ROS_INFO_STREAM("PointCloud representing the planar component: " <<
-                        cloud_p->width * cloud_p->height << " data points. From a total of : " <<
-                        cloud_filtered2->points.size());
+        e_ros = ros::Time::now();
+        ROS_INFO(">> CPU Time Plane extraction: %.2fms.",
+                 (e_ros - s_ros).toNSec() * 1e-6);
+
+        ROS_DEBUG_STREAM("PointCloud representing the planar component: " <<
+                         cloud_p->width * cloud_p->height << " data points. From a total of : " <<
+                         cloud_filtered2->points.size());
     }
     if (publish_outliers) {
+        s_ros = ros::Time::now();
+
         // Fill in the cloud data for the outliers
         extract.setNegative(true);
         extract.filter(*outliers_p);
@@ -211,6 +242,10 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
         fitlering_obj.setMeanK(50); // neighboring points to query
         fitlering_obj.setStddevMulThresh(1.0); //std deviation
         fitlering_obj.filter(*outliers_p); // cloud_filtered
+        e_ros = ros::Time::now();
+        ROS_INFO(">> CPU Time Outlier extraction: %.2fms.",
+                 (e_ros - s_ros).toNSec() * 1e-6);
+
     }
 
     if (segment_objects) {
@@ -219,7 +254,8 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
         pcl::PointCloud<pcl::PointXYZRGB>::Ptr objects(new
                                                        pcl::PointCloud<pcl::PointXYZRGB>);
         if (advanced_filter) {
-            ROS_INFO_STREAM("Using advanced filter.");
+            ROS_DEBUG_STREAM("Using advanced filter.");
+            s_ros = ros::Time::now();
             // Copy the points of the plane to a new cloud.
             pcl::PointCloud<pcl::PointXYZRGB>::Ptr plane(new
                                                          pcl::PointCloud<pcl::PointXYZRGB>);
@@ -254,7 +290,7 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
                 prism.segment(*objectIndices);
 
                 if (objectIndices->indices.size() > 0) {
-                    ROS_INFO_STREAM("Found some points in the convex hull prism.");
+                    ROS_DEBUG_STREAM("Found some points in the convex hull prism.");
                     // Get and show all points retrieved by the hull.
                     extract_hull.setIndices(objectIndices);
                     extract_hull.filter(*objects);
@@ -262,11 +298,16 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
             } else {
                 ROS_WARN_STREAM("The chosen hull is not planar.");
             }
+            e_ros = ros::Time::now();
+            ROS_INFO(">> CPU Time hull filtering: %.2fms.",
+                     (e_ros - s_ros).toNSec() * 1e-6);
+
         } else {
             // Simple statistical filtering
             ROS_INFO_STREAM("Passing though simple thresholding.");
             ROS_WARN_STREAM("SIMPLE DOES NOT RESPECT THE TF of the pointcloud. " <<
                             "It assumes z to be along the camera_depth_optical_frame");
+            s_ros = ros::Time::now();
             pcl::PassThrough<pcl::PointXYZRGB> pass;
             pass.setInputCloud(cloud_filtered2);
             pass.setFilterFieldName("z");
@@ -275,28 +316,14 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
             pass.setFilterLimits(simple_threshold_z_plane_height_min,
                                  simple_threshold_z_plane_height_max);
             pass.filter(*objects);
-        }
-        // Remove singled out points
-        for (int i = 0 ; i < 2; ++i) {
-            pcl::RadiusOutlierRemoval<pcl::PointXYZRGB> outrem;
-            // build the filter
-            outrem.setInputCloud(objects);
-            outrem.setRadiusSearch(neighboring_filter_radius); // 0.005 = 5 mm
+            e_ros = ros::Time::now();
+            ROS_INFO(">> CPU Time simple filtering: %.2fms.",
+                     (e_ros - s_ros).toNSec() * 1e-6);
 
-            // a total of how many points should be in the neighborhood
-            outrem.setMinNeighborsInRadius(neighboring_filter_n_count);
-            // apply filter
-            outrem.filter(*objects);
         }
-
-        // Apply some outlier filtering
-        pcl::StatisticalOutlierRemoval<pcl::PointXYZRGB> segm_obj_fitler;
-        segm_obj_fitler.setInputCloud(objects);
-        segm_obj_fitler.setMeanK(50); // neighboring points to query
-        segm_obj_fitler.setStddevMulThresh(1.0); //std deviation
-        segm_obj_fitler.filter(*objects); // cloud_filtered
 
         if (colour_filtering) {
+            s_ros = ros::Time::now();
             pcl::ConditionAnd<pcl::PointXYZRGB>::Ptr range_cond(
                 new pcl::ConditionAnd<pcl::PointXYZRGB>());
             range_cond->addComparison(
@@ -328,21 +355,79 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
             pcl::ConditionalRemoval<pcl::PointXYZRGB> condrem;
             condrem.setCondition(range_cond);
             condrem.setInputCloud(objects);
+
+            // condrem.setIndices(inliers); // TEST: JUST FOR TESTING REMOVE AFTER COMPILING
             condrem.setKeepOrganized(false); //was true
-            ROS_INFO_STREAM("1Obj: " << objects->width << " " << objects->height);
             condrem.filter(*objects);
 
-            ROS_INFO_STREAM("2Obj: " << objects->width << " " <<
-                            objects->height);
+            e_ros = ros::Time::now();
+            ROS_INFO(">> CPU Time colour filtering: %.2fms.",
+                     (e_ros - s_ros).toNSec() * 1e-6);
         }
 
-        ROS_INFO_STREAM("Covnerting and sending! final before");
+        if (postfiltering_segmented != -1) {
+            // Post filtering
+            s_ros = ros::Time::now();
+            // Remove singled out points
+            for (int i = 0 ; i < 2; ++i) {
+                pcl::RadiusOutlierRemoval<pcl::PointXYZRGB> outrem;
+                // build the filter
+                outrem.setInputCloud(objects);
+                outrem.setRadiusSearch(neighboring_filter_radius); // 0.005 = 5 mm
+
+                // a total of how many points should be in the neighborhood
+                outrem.setMinNeighborsInRadius(neighboring_filter_n_count);
+                // apply filter
+                outrem.filter(*objects);
+            }
+
+            // Apply some outlier filtering
+            pcl::StatisticalOutlierRemoval<pcl::PointXYZRGB> segm_obj_fitler;
+            segm_obj_fitler.setInputCloud(objects);
+            segm_obj_fitler.setMeanK(
+                postfiltering_segmented); // neighboring points to query
+            segm_obj_fitler.setStddevMulThresh(1.0); //std deviation
+            segm_obj_fitler.filter(*objects); // cloud_filtered
+
+            e_ros = ros::Time::now();
+            ROS_INFO(">> CPU Time postfiltering: %.2fms.", (e_ros - s_ros).toNSec() * 1e-6);
+        }
+
+        if (euclidean_clustering) {
+            // clock_t tStart = clock();
+            // // Creating the KdTree object for the search method of the extraction
+            // pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree (new
+            //                                                  pcl::search::KdTree<pcl::PointXYZRGB>);
+            // tree->setInputCloud(objects);
+
+            // std::vector<pcl::PointIndices> cluster_indices;
+            // pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> ec;
+            // ec.setClusterTolerance(0.02); // 2cm
+            // ec.setMinClusterSize(100);
+            // ec.setMaxClusterSize(25000);
+            // ec.setSearchMethod(tree);
+            // ec.setInputCloud(objects);
+            // ec.extract(cluster_indices);
+
+            // ROS_INFO(">> CPU Time euclidean clustering: %.2fms",
+            //          (double)(clock() - tStart) / CLOCKS_PER_SEC * 1000);
+            // ROS_INFO_STREAM("Found " << cluster_indices.size() << " clusters.");
+            /*
+            std::vector<int> ivec;
+            std::iota(ivec.begin(), ivec.end(), 0); // 0, 1, 2, 3, 4 ...
+            */
+        }
+
+        s_ros = ros::Time::now();
+        ROS_DEBUG_STREAM("Converting and sending segmented objects!");
         sensor_msgs::PointCloud2 segm_obj;
         pcl::toROSMsg(*objects, segm_obj);
         // segm_obj.header.stamp = ros::Time::now();
         segmented_pub.publish(segm_obj);
-        // segmented_pub.publish(non_nans);
-        ROS_INFO_STREAM("published");
+        e_ros = ros::Time::now();
+        ROS_INFO(">> CPU Time publishing segmented obj: %.2fms.",
+                 (e_ros - s_ros).toNSec() * 1e-6);
+        ROS_DEBUG_STREAM("published segmented objects");
         // End thresholding
     }
 
@@ -376,10 +461,11 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
     //   j++;
     // }
 
+    s_ros = ros::Time::now();
     pcl::PCLPointCloud2 segmented_pcl, outliers_pcl;
     sensor_msgs::PointCloud2 segmented, segmented_outliers;
     if (publish_planes) {
-        ROS_INFO_STREAM("Publishing!\n");
+        ROS_DEBUG_STREAM("Publishing plane!\n");
         pcl::toPCLPointCloud2(*cloud_p, segmented_pcl);
         pcl_conversions::fromPCL(segmented_pcl, segmented);
         plane_pub.publish(segmented);
@@ -389,6 +475,12 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
         pcl_conversions::fromPCL(outliers_pcl, segmented_outliers);
         outlier_pub.publish(segmented_outliers);
     }
+    e_ros = ros::Time::now();
+    ROS_INFO(">> CPU Time publishing plane/outliers: %.2fms.",
+             (e_ros - s_ros).toNSec() * 1e-6);
+    ROS_INFO(">> CPU Time Total: %.2fms.",
+             (ros::Time::now() - total_time).toNSec() * 1e-6);
+    ROS_INFO("---");
     //Update the viewer
     updatePCLViewer();
 }
@@ -421,6 +513,9 @@ void dynamic_recongifure_callback(
     colour_g_max_new = config.colour_g_max;
     colour_b_min_new = config.colour_b_min;
     colour_b_max_new = config.colour_b_max;
+    euclidean_clustering_new = config.euclidean_clustering;
+    prefiltering_new = config.prefiltering;
+    postfiltering_segmented_new = config.postfiltering_segmented;
 
     // Indicate new params need to be read
     should_update_params = true;
@@ -436,7 +531,10 @@ void dynamic_recongifure_callback(
                      neighboring_filter_n_count_new << " " <<
                      colour_filtering_new << " " <<
                      publish_planes_new << " " <<
-                     publish_outliers_new);
+                     publish_outliers_new << " " <<
+                     euclidean_clustering << " " <<
+                     prefiltering_new << " " <<
+                     postfiltering_segmented_new);
 }
 
 bool request_pointcloud_callback(
