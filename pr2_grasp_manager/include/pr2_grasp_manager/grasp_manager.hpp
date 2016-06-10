@@ -58,6 +58,7 @@ class GraspManager {
 	bool ready_to_grasp_;
 	bool ready_to_pick_;
 	bool ready_to_place_;
+	bool execute_motion_;
 
 	// Parameters
 

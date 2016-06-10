@@ -44,6 +44,7 @@ void GraspManager::init() {
   ready_to_pick_ = false;
   ready_to_place_ = false;
   eval_thresh = 0;
+  execute_motion_ = false; // Whether to actually move or not
 
   // Haf Grasping Goal request
   goal_.header.frame_id = "base_link";
@@ -141,6 +142,19 @@ void GraspManager::sendPick() {
     pick.goal.object_pose.position.z =
       std::max(0.68, pick.goal.object_pose.position.z - 0.055);
 
+    // grasp_res_.roll = 2.35619; // Test fake roll
+
+    // Eigen::AngleAxisd rollAngle(0, Eigen::Vector3d::UnitX());
+    // Eigen::AngleAxisd pitchAngle(0, Eigen::Vector3d::UnitY());
+    // Eigen::AngleAxisd yawAngle(grasp_res_.roll, Eigen::Vector3d::UnitZ());
+
+    // Eigen::Quaternion<double> n_q = rollAngle * yawAngle * pitchAngle;
+
+    // std::cout << "x:" << n_q.x()
+    //           << " y:" << n_q.y()
+    //           << " z:" << n_q.z()
+    //           << " w:" << n_q.w();
+
     tf2::Quaternion q;    // TODO: WHY DOES IT ONLY WORK LIKE THIS?
     q.setRPY(0, 0, (grasp_res_.roll / M_PI) * 180);
     pick.goal.object_pose.orientation.x = q.w();
@@ -152,7 +166,7 @@ void GraspManager::sendPick() {
               " Z:" << q.z() <<
               " W:" << q.w();
     std::cout << pick.goal;
-    pickplace_ac_.sendGoal(pick);
+    if (execute_motion_) { pickplace_ac_.sendGoal(pick); }
     bool finished_before_timeout = pickplace_ac_.waitForResult(ros::Duration(10.0));
     ready_to_place_ = true;
   }
@@ -170,7 +184,7 @@ void GraspManager::sendPlace() {
     place.goal.header.stamp = ros::Time::now();
     place.goal.object_pose = place_pose_;
     std::cout << place.goal;
-    pickplace_ac_.sendGoal(place);
+    if (execute_motion_) { pickplace_ac_.sendGoal(place); }
     bool finished_before_timeout = pickplace_ac_.waitForResult(ros::Duration(10.0));
     ready_to_grasp_ = true;
     request_pc_.call(empty_);
