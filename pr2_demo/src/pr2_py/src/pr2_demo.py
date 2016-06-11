@@ -10,6 +10,7 @@ import moveit_commander
 import moveit_msgs.msg
 import geometry_msgs.msg
 import std_msgs
+import actionlib
 
 #from std_msgs.msg import String
 # from scipy import linalg
@@ -22,6 +23,8 @@ from moveit_msgs.msg import (VisibilityConstraint, Constraints,
 
 from shape_msgs.msg import SolidPrimitive
 from visualization_msgs.msg import Marker, MarkerArray
+
+from pr2_controllers_msgs.msg import *
 
 def qv_mult(q1, v1):
     v1 = tf.transformations.unit_vector(v1)
@@ -253,6 +256,19 @@ def pick_n_place():
     markerArray_pub = rospy.Publisher('visualization_marker_array', MarkerArray, queue_size = 1)
 
     # add_scene_object(sc = scene)
+    l_gripperClient = actionlib.SimpleActionClient("/l_gripper_controller/gripper_action",
+                                                      Pr2GripperCommandAction)
+
+    if not l_gripperClient.wait_for_server(rospy.Duration(10.0)):
+        rospy.logerr("Could not connect to /l_gripper_controller/gripper_action action server.")
+        exit(1)
+
+    r_gripperClient = actionlib.SimpleActionClient("/r_gripper_controller/gripper_action",
+                                                      Pr2GripperCommandAction)
+
+    if not r_gripperClient.wait_for_server(rospy.Duration(10.0)):
+        rospy.logerr("Could not connect to /r_gripper_controller/gripper_action action server.")
+        exit(1)
 
     while not rospy.is_shutdown():
         try:
@@ -283,19 +299,22 @@ def pick_n_place():
             pose_array = get_manip_pose('ros_hydro', markerArray_pub, (0.23, 0.28,
                                                                   0.03))
 
-            p = PoseStamped()
-            p.header = pose_array.header
+            p1 = PoseStamped()
+            p1.header = pose_array.header
 
-            p.pose = pose_array.poses[0]
-            p.pose.position.z -= 0.018
-            p.pose.position.x -= 0.03
-            r_goal = tf2_geometry_msgs.do_transform_pose(p,trans)
+            p1.pose = pose_array.poses[0]
+            p1.pose.position.z -= 0.018
+            p1.pose.position.x -= 0.03
+            r_goal = tf2_geometry_msgs.do_transform_pose(p1,trans)
 
 
-            p.pose = pose_array.poses[1]
-            p.pose.position.z -= 0.025
-            p.pose.position.x += 0.005
-            l_goal = tf2_geometry_msgs.do_transform_pose(p,trans)
+            p2 = PoseStamped()
+            p2.header = pose_array.header
+
+            p2.pose = pose_array.poses[1]
+            p2.pose.position.z -= 0.025
+            p2.pose.position.x += 0.005
+            l_goal = tf2_geometry_msgs.do_transform_pose(p2,trans)
 
             dual_arm.set_goal_tolerance(0.01)
             dual_arm.allow_replanning(True)
@@ -303,44 +322,129 @@ def pick_n_place():
             dual_arm.set_pose_target(l_goal, 'l_wrist_roll_link')
             dual_arm.set_start_state_to_current_state()
             # dual_arm.plan()
-            l_gripper.set_start_state_to_current_state()
-            l_gripper.set_joint_value_target((0.03))
-            l_gripper.plan()
-            rospy.sleep(5)
-            l_gripper.go(wait=True)
+            # rospy.sleep(3)
             # dual_arm.go(wait=True)
-            # rospy.sleep(8)
+            # rospy.sleep(2)
 
-            # constraints = Constraints()
-            # constraints.name = "Gripper Control"
+
+            #approach object
+            p1.pose.position.x -= 0.01
+            p2.pose.position.x += 0.021
+
+            r_goal = tf2_geometry_msgs.do_transform_pose(p1,trans)
+            l_goal = tf2_geometry_msgs.do_transform_pose(p2,trans)
+
+            dual_arm.set_pose_target(r_goal, 'r_wrist_roll_link')
+            dual_arm.set_pose_target(l_goal, 'l_wrist_roll_link')
+            dual_arm.set_start_state_to_current_state()
+            # dual_arm.plan()
+            # rospy.sleep(3)
+            # dual_arm.go(wait=True)
+            # rospy.sleep(2)
+
+
+
+
+            # # Setting Gripper commands and position
+            # cm = Pr2GripperCommand()
+            # cm.position = 0.08
+            # cm.max_effort = -1
+            # grip_goal = Pr2GripperCommandGoal(cm)
+            # r_gripperClient.send_goal(grip_goal)
             #
-            # # Create an orientation constraint for the right gripper
-            # # orientation_constraint = OrientationConstraint()
-            # # orientation_constraint.header.frame_id = "r_wrist_roll_link"
-            # # orientation_constraint.link_name = right_arm.get_end_effector_link()
-            # # orientation_constraint.orientation = pose_target.orientation
-            # # orientation_constraint.absolute_x_axis_tolerance = 10
-            # # orientation_constraint.absolute_y_axis_tolerance = 10
-            # # orientation_constraint.absolute_z_axis_tolerance = 10
-            # # orientation_constraint.weight = 0.1
-            # #
-            # # # Append the constraint to the list of contraints
-            # # constraints.orientation_constraints.append(orientation_constraint)
+            # r_gripperClient.wait_for_result()
+            #
+            # result = r_gripperClient.get_result()
+            # did = []
             #
             #
-            # # position_constraint = PositionConstraint()
-            # # position_constraint.header.frame_id = "r_wrist_roll_link"
-            # # position_constraint.link_name = right_arm.get_end_effector_link()
-            # # position_constraint.weight = 0.001
-            # # position_constraint.target_point_offset = Vector3(0.2,0,0)
-            # # # position_constraint.constraint_region.primitives.append(SolidPrimitive(type=SolidPrimitive.SPHERE,dimensions=[10]))
-            # # position_constraint.constraint_region.primitive_poses.append(pose_target)
-            # # constraints.position_constraints.append(position_constraint)
+            # if r_gripperClient.get_state() != actionlib.GoalStatus.SUCCEEDED:
+            #     did.append("failed!")
+            # else:
+            #     if result.stalled: did.append("stalled!")
+            #     if result.reached_goal: did.append("succeeded!")
+            #     return ' and '.join(did)
             #
-            # rospy.loginfo(constraints)
+
+
+
+
+
+            constraints = Constraints()
+            constraints.name = 'Dual-Arm Constraints'
+
+            # Create an orientation constraint for the right gripper
+            r_grip_const = dual_arm.get_current_pose('r_wrist_roll_link')
+            r_grip_oc = OrientationConstraint()
+            r_grip_oc.header = r_grip_const.header
+            r_grip_oc.link_name = 'r_wrist_roll_link'
+            r_grip_oc.orientation = p1.pose.orientation
+            r_grip_oc.absolute_x_axis_tolerance = 10
+            r_grip_oc.absolute_y_axis_tolerance = 10
+            r_grip_oc.absolute_z_axis_tolerance = 10
+            r_grip_oc.weight = 0.1
+            constraints.orientation_constraints.append(r_grip_oc)
+
+            # Create an orientation constraint for the left gripper
+            l_grip_const = dual_arm.get_current_pose('l_wrist_roll_link')
+            l_grip_oc = OrientationConstraint()
+            l_grip_oc.header = l_grip_const.header
+            l_grip_oc.link_name = 'l_wrist_roll_link'
+            l_grip_oc.orientation = p2.pose.orientation
+            l_grip_oc.absolute_x_axis_tolerance = 10
+            l_grip_oc.absolute_y_axis_tolerance = 10
+            l_grip_oc.absolute_z_axis_tolerance = 10
+            l_grip_oc.weight = 0.1
+            # Append the constraint to the list of contraints
+            constraints.orientation_constraints.append(l_grip_oc)
+            dual_arm.set_path_constraints(constraints)
+
+            r_grip_const.pose.position.z += 0.15
+            dual_arm.set_pose_target(r_grip_const, 'r_wrist_roll_link')
+
+            l_grip_const.pose.position.z += 0.15
+            dual_arm.set_pose_target(l_grip_const, 'l_wrist_roll_link')
+
+
+
+            # dual_arm.plan()
+            # rospy.sleep(4)
+            # dual_arm.go(wait = True)
             #
-            # # Set the path constraints on the right_arm
-            # right_arm.set_path_constraints(constraints)
+
+            # dual_arm.clear_pose_targets()
+            # dual_arm.clear_path_constraints()
+
+
+            ## Rotate object
+
+            # r_grip_pc = dual_arm.get_current_pose('r_wrist_roll_link')
+            # position_constraint = PositionConstraint()
+            # position_constraint.header.frame_id = 'r_wrist_roll_link'
+            # position_constraint.link_name =  'r_wrist_roll_link'
+            # position_constraint.weight = 1
+            # position_constraint.target_point_offset = Vector3(0,0,0)
+            # position_constraint.constraint_region.primitives.append(SolidPrimitive(type=SolidPrimitive.SPHERE,dimensions=[1]))
+            # position_constraint.constraint_region.primitive_poses.append(dual_arm.get_random_pose('r_wrist_roll_link').pose)
+            # constraints.position_constraints.append(position_constraint)
+            #
+
+            r_rpy = dual_arm.get_current_rpy('r_wrist_roll_link')
+            dual_arm.set_rpy_target((0,r_rpy[1], r_rpy[2]),'r_wrist_roll_link')
+
+            l_rpy = dual_arm.get_current_rpy('l_wrist_roll_link')
+            dual_arm.set_rpy_target((0,l_rpy[1], l_rpy[2]),'l_wrist_roll_link')
+
+            # dual_arm.set_path_constraints(constraints)
+
+            dual_arm.plan()
+            rospy.sleep(4)
+
+
+            rospy.loginfo(constraints)
+
+            dual_arm.clear_pose_targets()
+            dual_arm.clear_path_constraints()
 
 
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException,
