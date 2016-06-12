@@ -136,8 +136,8 @@ void GraspManager::sendPick() {
     pick.goal.header.stamp = ros::Time::now();
     pick.goal.object_pose.position = grasp_res_.averagedGraspPoint;
     // Kinect Offsets
-    pick.goal.object_pose.position.x -= 0.035;
-    pick.goal.object_pose.position.y -= 0.02;
+    pick.goal.object_pose.position.x -= 0.031;
+    // pick.goal.object_pose.position.y -= 0.02;
     pick.goal.object_pose.position.z =
       std::max(0.68, pick.goal.object_pose.position.z - 0.055);
 

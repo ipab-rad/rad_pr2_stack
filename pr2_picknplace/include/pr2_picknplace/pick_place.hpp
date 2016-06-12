@@ -36,6 +36,16 @@
 #include <moveit_msgs/CollisionObject.h>
 #include <moveit_msgs/PlanningScene.h>
 
+// Sensor grasping
+#include <pr2_gripper_sensor_msgs/PR2GripperGrabAction.h>
+#include <pr2_gripper_sensor_msgs/PR2GripperReleaseAction.h>
+
+// The sensor msgs action aclient typedef
+typedef actionlib::SimpleActionClient<pr2_gripper_sensor_msgs::PR2GripperGrabAction>
+SensorGrabClient;
+typedef actionlib::SimpleActionClient<pr2_gripper_sensor_msgs::PR2GripperReleaseAction>
+SensorReleaseClient;
+
 class PickPlaceAction {
   protected:
     ros::NodeHandle nh_;
@@ -77,8 +87,12 @@ class PickPlaceAction {
     void SendGripperCommand(float position, float max_effort = -1.0f);
     bool CheckGripperFinished();
     moveit_msgs::CollisionObject deleteObject(std::string object_id);
+    bool SensorGrab();
+    bool SensorRelease();
 
     // Flags
+    bool sensor_grabbing;
+    bool sensor_releasing;
 
     // Parameters
     std::string wrist_roll_link;
@@ -89,6 +103,17 @@ class PickPlaceAction {
     double open_gripper_pos_;
     double close_gripper_pos_;
     double close_effort_;
+    bool use_touch_pads;
+    std::string sensor_gripper_controller_grab;
+    std::string sensor_gripper_controller_release;
+    std::string sensor_gripper_controller_param;
+    double hardness_gain;
+    double close_speed;
+    double fingertip_force_limit;
+    double deformation_limit;
+    double force_lightest;
+    double position_open;
+
 
     // Variables
     std::string ns_;
@@ -103,6 +128,9 @@ class PickPlaceAction {
     ros::Publisher pub_aco;
     actionlib::SimpleActionClient
     <pr2_controllers_msgs::Pr2GripperCommandAction>* gripper_client_;
+    SensorGrabClient* grab_client_;
+    SensorReleaseClient* release_client_;
+    ros::ServiceClient sensor_update_param_service;
 };
 
 namespace picknplace {

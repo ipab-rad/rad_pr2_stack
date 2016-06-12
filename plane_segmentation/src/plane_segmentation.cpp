@@ -100,6 +100,7 @@ ros::Publisher plane_pub;
 ros::Publisher outlier_pub;
 ros::Publisher segmented_pub;
 ros::Publisher cluster_pub;
+ros::Subscriber pointcloud_sub;
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_p(
     new pcl::PointCloud<pcl::PointXYZRGB>),
         cloud(new pcl::PointCloud<pcl::PointXYZRGB>),
@@ -346,28 +347,28 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
                 new pcl::ConditionAnd<pcl::PointXYZRGB>());
             range_cond->addComparison(
                 pcl::PackedRGBComparison<pcl::PointXYZRGB>::ConstPtr(
-                    new pcl::PackedRGBComparison<pcl::PointXYZRGB>("r", pcl::ComparisonOps::GT,
+                    new pcl::PackedRGBComparison<pcl::PointXYZRGB>("r", pcl::ComparisonOps::GE,
                                                                    colour_r_min)));
             range_cond->addComparison(
                 pcl::PackedRGBComparison<pcl::PointXYZRGB>::ConstPtr(
-                    new pcl::PackedRGBComparison<pcl::PointXYZRGB>("r", pcl::ComparisonOps::LT,
+                    new pcl::PackedRGBComparison<pcl::PointXYZRGB>("r", pcl::ComparisonOps::LE,
                                                                    colour_r_max)));
             range_cond->addComparison(
                 pcl::PackedRGBComparison<pcl::PointXYZRGB>::ConstPtr(
-                    new pcl::PackedRGBComparison<pcl::PointXYZRGB>("g", pcl::ComparisonOps::GT,
+                    new pcl::PackedRGBComparison<pcl::PointXYZRGB>("g", pcl::ComparisonOps::GE,
                                                                    colour_g_min)));
             range_cond->addComparison(
                 pcl::PackedRGBComparison<pcl::PointXYZRGB>::ConstPtr(
-                    new pcl::PackedRGBComparison<pcl::PointXYZRGB>("g", pcl::ComparisonOps::LT,
+                    new pcl::PackedRGBComparison<pcl::PointXYZRGB>("g", pcl::ComparisonOps::LE,
                                                                    colour_g_max)));
             range_cond->addComparison(
                 pcl::PackedRGBComparison<pcl::PointXYZRGB>::ConstPtr(
                     new pcl::PackedRGBComparison<pcl::PointXYZRGB>("b",
-                                                                   pcl::ComparisonOps::GT,
+                                                                   pcl::ComparisonOps::GE,
                                                                    colour_b_min)));
             range_cond->addComparison(
                 pcl::PackedRGBComparison<pcl::PointXYZRGB>::ConstPtr(
-                    new pcl::PackedRGBComparison<pcl::PointXYZRGB>("b", pcl::ComparisonOps::LT,
+                    new pcl::PackedRGBComparison<pcl::PointXYZRGB>("b", pcl::ComparisonOps::LE,
                                                                    colour_b_max)));
             // build the filter
             pcl::ConditionalRemoval<pcl::PointXYZRGB> condrem;
@@ -608,8 +609,9 @@ int main(int argc, char** argv) {
     f = boost::bind(&dynamic_recongifure_callback, _1, _2);
     server.setCallback(f);
 
-    //Possible pointclouds: "/kinect2/sd/points" //xtion: "/camera/depth_registered/points"
-    ros::Subscriber sub = nh.subscribe("/kinect2/sd/points", 1, new_cloud_callback);
+    // Possible pointclouds: "/kinect2/hd/points" //xtion: "/camera/depth_registered/points"
+    // Pro tip: Use qhd or hd topic, as the sd pointcloud has an offset in y direction.
+    pointcloud_sub = nh.subscribe("/kinect2/qhd/points", 1, new_cloud_callback);
 
     // Create a ROS publisher for the output point cloud
     plane_pub = nh.advertise<sensor_msgs::PointCloud2>("extracted_planes", 1);
