@@ -244,7 +244,7 @@ def pick_n_place():
 
     display_trajectory_publisher = rospy.Publisher(
         '/move_group/display_planned_path',
-        moveit_msgs.msg.DisplayTrajectory)
+        moveit_msgs.msg.DisplayTrajectory, queue_size = 1)
 
 
     tfBuffer = tf2_ros.Buffer()
@@ -268,7 +268,7 @@ def pick_n_place():
         rospy.logerr("Could not connect to /r_gripper_controller/gripper_action action server.")
         exit(1)
 
-    point_cloud_offset_z = 0.03
+    point_cloud_offset_z = 0.05
 
     raw_input("Press Enter to continue if Rviz visable...")
 
@@ -277,60 +277,60 @@ def pick_n_place():
             trans = tfBuffer.lookup_transform('odom_combined', 'ros_hydro',
                                               rospy.Time(0))
 
-            pose_target = geometry_msgs.msg.PoseStamped()
-            pose_target.header.frame_id = 'odom_combined'
-            pose_target.header.stamp = rospy.Time(0)
-            pose_target.pose.position.x = trans.transform.translation.x
-            pose_target.pose.position.y = trans.transform.translation.y
-            pose_target.pose.position.z = trans.transform.translation.z
-            pose_target.pose.orientation.x = trans.transform.rotation.x
-            pose_target.pose.orientation.y = trans.transform.rotation.y
-            pose_target.pose.orientation.z = trans.transform.rotation.z
-            pose_target.pose.orientation.w = trans.transform.rotation.w
-
-            # rospy.loginfo(pose_target)
-
-            # scene.add_box('ros_hydro', pose_target, (0.2,0.28,0.01) )
-            p = PoseStamped()
-            p.header.frame_id = 'odom_combined'
-            p.pose.position = Point(0.13,1.9, 0.44)
-            p.pose.orientation.w = 1.0
-            # scene.add_box('Table', p, (1.2,1.2,0.7))
-
-            # rospy.loginfo("test print")
-            pose_array = get_manip_pose('ros_hydro', markerArray_pub, (0.23, 0.28,
-                                                                  0.03))
-
-            p1 = PoseStamped()
-            p1.header = pose_array.header
-
-            p1.pose = pose_array.poses[0]
-            p1.pose.position.z -= point_cloud_offset_z
-            p1.pose.position.x -= 0.03
-            r_goal = tf2_geometry_msgs.do_transform_pose(p1,trans)
-
-
-            p2 = PoseStamped()
-            p2.header = pose_array.header
-
-            p2.pose = pose_array.poses[1]
-            p2.pose.position.z -= point_cloud_offset_z
-            p2.pose.position.x += 0.01
-            l_goal = tf2_geometry_msgs.do_transform_pose(p2,trans)
-
-            dual_arm.set_goal_tolerance(0.01)
-            dual_arm.set_pose_target(r_goal, 'r_wrist_roll_link')
-            dual_arm.set_pose_target(l_goal, 'l_wrist_roll_link')
-            dual_arm.set_start_state_to_current_state()
-            dual_arm.plan()
+            # pose_target = geometry_msgs.msg.PoseStamped()
+            # pose_target.header.frame_id = 'odom_combined'
+            # pose_target.header.stamp = rospy.Time(0)
+            # pose_target.pose.position.x = trans.transform.translation.x
+            # pose_target.pose.position.y = trans.transform.translation.y
+            # pose_target.pose.position.z = trans.transform.translation.z
+            # pose_target.pose.orientation.x = trans.transform.rotation.x
+            # pose_target.pose.orientation.y = trans.transform.rotation.y
+            # pose_target.pose.orientation.z = trans.transform.rotation.z
+            # pose_target.pose.orientation.w = trans.transform.rotation.w
+            #
+            # # rospy.loginfo(pose_target)
+            #
+            # # scene.add_box('ros_hydro', pose_target, (0.2,0.28,0.01) )
+            # p = PoseStamped()
+            # p.header.frame_id = 'odom_combined'
+            # p.pose.position = Point(0.13,1.9, 0.44)
+            # p.pose.orientation.w = 1.0
+            # # scene.add_box('Table', p, (1.2,1.2,0.7))
+            #
+            # # rospy.loginfo("test print")
+            # pose_array = get_manip_pose('ros_hydro', markerArray_pub, (0.23, 0.28,
+            #                                                       0.03))
+            #
+            # p1 = PoseStamped()
+            # p1.header = pose_array.header
+            #
+            # p1.pose = pose_array.poses[0]
+            # p1.pose.position.z -= point_cloud_offset_z
+            # p1.pose.position.x -= 0.03
+            # r_goal = tf2_geometry_msgs.do_transform_pose(p1,trans)
+            #
+            #
+            # p2 = PoseStamped()
+            # p2.header = pose_array.header
+            #
+            # p2.pose = pose_array.poses[1]
+            # p2.pose.position.z -= point_cloud_offset_z
+            # p2.pose.position.x += 0.01
+            # l_goal = tf2_geometry_msgs.do_transform_pose(p2,trans)
+            #
+            # dual_arm.set_goal_tolerance(0.01)
+            # dual_arm.set_pose_target(r_goal, 'r_wrist_roll_link')
+            # dual_arm.set_pose_target(l_goal, 'l_wrist_roll_link')
+            # dual_arm.set_start_state_to_current_state()
+            # dual_arm.plan()
             # rospy.sleep(3)
             # dual_arm.go(wait=True)
             # rospy.sleep(2)
             #
             #
             # #approach object
-            # p1.pose.position.x -= 0.01
-            # p2.pose.position.x += 0.021
+            # p1.pose.position.x -= 0.02
+            # p2.pose.position.x += 0.02
             #
             # r_goal = tf2_geometry_msgs.do_transform_pose(p1,trans)
             # l_goal = tf2_geometry_msgs.do_transform_pose(p2,trans)
@@ -416,21 +416,28 @@ def pick_n_place():
             # dual_arm.clear_path_constraints()
             #
             #
-            #
-            # #approach object
-            # p1.pose.position.x -= 0.002
-            # p2.pose.position.x += 0.002
-            #
-            # r_goal = tf2_geometry_msgs.do_transform_pose(p1,trans)
-            # l_goal = tf2_geometry_msgs.do_transform_pose(p2,trans)
-            #
-            # dual_arm.set_pose_target(r_goal, 'r_wrist_roll_link')
-            # dual_arm.set_pose_target(l_goal, 'l_wrist_roll_link')
-            # dual_arm.set_start_state_to_current_state()
-            # dual_arm.plan()
-            # rospy.sleep(3)
-            # dual_arm.go(wait=True)
-            # rospy.sleep(2)
+            # # rospy.loginfo("2 =================================================")
+            # # #TODO: Need to update to current pose before approach object
+            # # dual_arm.set_pose_reference_frame('ros_hydro')
+            # #
+            # # pt1 = dual_arm.get_current_pose('r_wrist_roll_link')
+            # # p1.pose = pt1.pose
+            # # p1.pose.position.x -= 0.002
+            # #
+            # # pt2 = dual_arm.get_current_pose('l_wrist_roll_link')
+            # # p2.pose = pt2.pose
+            # # p2.pose.position.x += 0.002
+            # #
+            # # r_goal = tf2_geometry_msgs.do_transform_pose(p1,trans)
+            # # l_goal = tf2_geometry_msgs.do_transform_pose(p2,trans)
+            # #
+            # # dual_arm.set_pose_target(r_goal, 'r_wrist_roll_link')
+            # # dual_arm.set_pose_target(l_goal, 'l_wrist_roll_link')
+            # # dual_arm.set_start_state_to_current_state()
+            # # dual_arm.plan()
+            # # rospy.sleep(3)
+            # # dual_arm.go(wait=True)
+            # # rospy.sleep(2)
             #
             # ## Rotate object
             #
@@ -452,13 +459,26 @@ def pick_n_place():
             # dual_arm.plan()
             # rospy.sleep(4)
             # dual_arm.go(wait = True)
-            # rospy.sleep(8)
+            # rospy.sleep(4)
             #
             #
+            #
+            dual_arm.set_pose_reference_frame('ros_hydro')
+            dual_arm.shift_pose_target(0, 0.02,'r_wrist_roll_link')
+            dual_arm.shift_pose_target(0, 0.02,'l_wrist_roll_link')
+
+
+            #TODO: Do circles with the object
+
+
+            dual_arm.plan()
+
+            rospy.sleep(1)
+
+
+            dual_arm.clear_pose_targets()
+            dual_arm.clear_path_constraints()
             # rospy.loginfo(constraints)
-            #
-            # dual_arm.clear_pose_targets()
-            # dual_arm.clear_path_constraints()
             # exit(1)
 
 
