@@ -37,6 +37,7 @@ GraspManager::~GraspManager() {
 }
 
 void GraspManager::loadParams() {
+  ros::param::param(ns_ + "/max_ac_execution_time", max_ac_execution_time, 10.0);
 }
 
 void GraspManager::init() {
@@ -98,7 +99,8 @@ void GraspManager::pcCB(const sensor_msgs::PointCloud2ConstPtr& msg) {
   }
 }
 
-void GraspManager::getGrasp() {
+bool GraspManager::getGrasp() {
+  bool success = false;
   if (!pc_ready_) {
     ROS_INFO_THROTTLE(1, "Waiting for PC...");
   } else if (!ready_to_grasp_) {
@@ -117,15 +119,17 @@ void GraspManager::getGrasp() {
       ROS_INFO("Action finished: %s", state.toString().c_str());
       grasp_res_ = haf_ac_.getResult()->graspOutput;
       std::cout << grasp_res_;
-      if (grasp_res_.eval > eval_thresh) { ready_to_pick_ = true; }
+      if (grasp_res_.eval > eval_thresh) { ready_to_pick_ = true; success = true;}
       else {request_pc_.call(empty_); ready_to_grasp_ = true; }
     } else {
       ROS_INFO("Action did not finish before the time out.");
     }
   }
+  return success;
 }
 
-void GraspManager::sendPick() {
+bool GraspManager::sendPick() {
+  bool success = false;
   if (!ready_to_pick_) {
     ROS_INFO_THROTTLE(1, "Waiting for valid grasp pose...");
   } else {
@@ -136,6 +140,7 @@ void GraspManager::sendPick() {
     pick.goal.header.frame_id = "base_link";
     pick.goal.header.stamp = ros::Time::now();
     pick.goal.object_pose.position = grasp_res_.averagedGraspPoint;
+
     // Kinect Offsets
     pick.goal.object_pose.position.x -= 0.031;
     // pick.goal.object_pose.position.y -= 0.02;
@@ -154,12 +159,16 @@ void GraspManager::sendPick() {
               " W:" << q.w();
     std::cout << pick.goal;
     pickplace_ac_.sendGoal(pick);
-    bool finished_before_timeout = pickplace_ac_.waitForResult(ros::Duration(10.0));
+    bool finished_before_timeout = pickplace_ac_.waitForResult(
+                                     ros::Duration(max_ac_execution_time));
+    success = pickplace_ac_.getResult()->success;
     ready_to_place_ = true;
   }
+  return success;
 }
 
-void GraspManager::sendPlace() {
+bool GraspManager::sendPlace() {
+  bool success = false;
   if (!ready_to_place_) {
     ROS_INFO_THROTTLE(1, "Waiting for object to be picked...");
   } else {
@@ -172,8 +181,27 @@ void GraspManager::sendPlace() {
     place.goal.object_pose = place_pose_;
     std::cout << place.goal;
     pickplace_ac_.sendGoal(place);
-    bool finished_before_timeout = pickplace_ac_.waitForResult(ros::Duration(10.0));
+    bool finished_before_timeout = pickplace_ac_.waitForResult(
+                                     ros::Duration(max_ac_execution_time));
+    success = pickplace_ac_.getResult()->success;
     ready_to_grasp_ = true;
     request_pc_.call(empty_);
   }
+  return success;
+}
+
+bool GraspManager::sendMoveTo() {
+  bool success = true;
+  ROS_INFO("Moving arm out of the way!");
+  pr2_picknplace_msgs::PickPlaceGoal place;
+  place.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST;
+  place.goal.header.frame_id = "base_link";
+  place.goal.header.stamp = ros::Time::now();
+  place.goal.object_pose = place_pose_;
+  std::cout << place.goal;
+  pickplace_ac_.sendGoal(place);
+  success &= pickplace_ac_.waitForResult(ros::Duration(max_ac_execution_time));
+  success &= pickplace_ac_.getResult()->success;
+  request_pc_.call(empty_);
+  return success;
 }

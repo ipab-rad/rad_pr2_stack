@@ -20,9 +20,13 @@ int main(int argc, char** argv) {
 
   while (ros::ok()) {
     ros::spinOnce();
-    grasp_manager.getGrasp();
-    grasp_manager.sendPick();
-    grasp_manager.sendPlace();
+    if (grasp_manager.getGrasp()) {
+      if (grasp_manager.sendPick()) {
+        grasp_manager.sendPlace();
+      } else {
+        grasp_manager.sendMoveTo();
+      }
+    }
     r.sleep();
   }
 

@@ -34,22 +34,23 @@
 #include <pr2_picknplace_msgs/PicknPlaceGoal.h>
 
 class GraspManager {
- protected:
+  protected:
 	void loadParams();
 	void init();
 	void rosSetup();
 
 	ros::NodeHandle nh_;
 
- public:
+  public:
 	GraspManager(ros::NodeHandle& nh);
 	~GraspManager(void);
 
-	void getGrasp();
-	void sendPick();
-	void sendPlace();
+	bool getGrasp();
+	bool sendPick();
+	bool sendPlace();
+	bool sendMoveTo();
 
- private:
+  private:
 	// Methods
 	void pcCB(const sensor_msgs::PointCloud2ConstPtr& msg);
 
@@ -60,6 +61,7 @@ class GraspManager {
 	bool ready_to_place_;
 
 	// Parameters
+	double max_ac_execution_time;
 
 	// Variables
 	std::string ns_;
