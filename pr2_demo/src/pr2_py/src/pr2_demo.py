@@ -269,11 +269,13 @@ def pick_n_place():
         exit(1)
 
     point_cloud_offset_z = 0.05
+    approach_dist = 0.005
 
     raw_input("Press Enter to continue if Rviz visable...")
 
     while not rospy.is_shutdown():
         try:
+            # rospy.sleep(4)
             trans = tfBuffer.lookup_transform('odom_combined', 'ros_hydro',
                                               rospy.Time(0))
 
@@ -329,8 +331,8 @@ def pick_n_place():
             #
             #
             # #approach object
-            # p1.pose.position.x -= 0.02
-            # p2.pose.position.x += 0.02
+            # p1.pose.position.x -= approach_dist
+            # p2.pose.position.x += approach_dist
             #
             # r_goal = tf2_geometry_msgs.do_transform_pose(p1,trans)
             # l_goal = tf2_geometry_msgs.do_transform_pose(p2,trans)
@@ -464,20 +466,44 @@ def pick_n_place():
             #
             #
             dual_arm.set_pose_reference_frame('ros_hydro')
-            dual_arm.shift_pose_target(0, 0.02,'r_wrist_roll_link')
-            dual_arm.shift_pose_target(0, 0.02,'l_wrist_roll_link')
 
+
+
+            dual_arm.shift_pose_target(0, 0.05,'r_wrist_roll_link')
+            dual_arm.shift_pose_target(0, 0.05,'l_wrist_roll_link')
+            dual_arm.plan()
+            rospy.sleep(1)
+            dual_arm.go(wait = True)
+            rospy.sleep(1)
+
+            dual_arm.shift_pose_target(1, 0.05,'r_wrist_roll_link')
+            dual_arm.shift_pose_target(1, 0.05,'l_wrist_roll_link')
+            dual_arm.plan()
+            rospy.sleep(1)
+            dual_arm.go(wait = True)
+            rospy.sleep(1)
+
+
+            dual_arm.shift_pose_target(0, -0.05,'r_wrist_roll_link')
+            dual_arm.shift_pose_target(0, -0.05,'l_wrist_roll_link')
+            dual_arm.plan()
+            rospy.sleep(1)
+            dual_arm.go(wait = True)
+            rospy.sleep(1)
+
+            dual_arm.shift_pose_target(1, -0.05,'r_wrist_roll_link')
+            dual_arm.shift_pose_target(1, -0.05,'l_wrist_roll_link')
+            dual_arm.plan()
+            rospy.sleep(1)
+            dual_arm.go(wait = True)
+            rospy.sleep(1)
 
             #TODO: Do circles with the object
 
 
-            dual_arm.plan()
 
-            rospy.sleep(1)
-
-
-            dual_arm.clear_pose_targets()
-            dual_arm.clear_path_constraints()
+            # dual_arm.clear_pose_targets()
+            # dual_arm.clear_path_constraints()
             # rospy.loginfo(constraints)
             # exit(1)
 
