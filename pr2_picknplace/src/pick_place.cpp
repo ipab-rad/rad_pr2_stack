@@ -216,13 +216,14 @@ void PickPlaceAction::executeCB() {
 
   switch (pick_place_goal_.request) {
     case pr2_picknplace_msgs::PicknPlaceGoal::PICK_REQUEST: //picknplace::REQUEST_PICK:
-      PickCube(ps);
+      success &= PickCube(ps);
       break;
     case pr2_picknplace_msgs::PicknPlaceGoal::PLACE_REQUEST:
-      PlaceCube(ps);
+      success &= PlaceCube(ps);
       break;
-    case pr2_picknplace_msgs::PicknPlaceGoal::MOVE_REQUEST:
-      ROS_WARN("Move Request not implemented yet.");
+    case pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST:
+      ROS_WARN("Move Request experimental yet.");
+      success &= MoveTo(ps);
       break;
   }
 
@@ -526,6 +527,28 @@ bool PickPlaceAction::PlaceCube(geometry_msgs::PoseStamped ps) {
     if (success) { success &= move_group_arm.execute(postplace_plan); }
     ROS_INFO_STREAM("[PICKPLACEACTION] MoveIt execution of plan: "
                     << ((success) ? "success" : "fail"));
+  } else {
+    ROS_INFO_STREAM("[PICKPLACEACTION] Failed to find a plan for pose: "
+                    << pick_place_goal_.object_pose);
+  }
+
+  return success;
+}
+
+bool PickPlaceAction::MoveTo(geometry_msgs::PoseStamped ps) {
+  moveit::planning_interface::MoveGroup::Plan moveto_plan;
+  geometry_msgs::Pose p = ps.pose;
+  moveit::core::RobotState moveto_robot_state = RobotStateFromPose(p);
+
+  bool success = Plan(*move_group_arm.getCurrentState(),
+                      moveto_robot_state,
+                      moveto_plan);
+  ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'MoveTo': " <<
+                  ((success) ? "success" : "fail"));
+  if (success) {
+    ROS_INFO_STREAM("[PICKPLACEACTION] Executing on the robot ...");
+    success &= move_group_arm.execute(moveto_plan);
+    ros::WallDuration(exec_wait_).sleep();
   } else {
     ROS_INFO_STREAM("[PICKPLACEACTION] Failed to find a plan for pose: "
                     << pick_place_goal_.object_pose);

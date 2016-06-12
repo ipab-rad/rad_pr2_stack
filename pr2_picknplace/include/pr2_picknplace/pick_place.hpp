@@ -77,6 +77,7 @@ class PickPlaceAction {
     void AddAttachedCollBox(geometry_msgs::Pose p);
     bool PickCube(geometry_msgs::PoseStamped ps);
     bool PlaceCube(geometry_msgs::PoseStamped ps);
+    bool MoveTo(geometry_msgs::PoseStamped ps);
 
     bool Plan(moveit::core::RobotState start, moveit::core::RobotState end,
               moveit::planning_interface::MoveGroup::Plan& plan,
