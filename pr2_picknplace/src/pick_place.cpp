@@ -8,6 +8,7 @@
 
 #include "pr2_picknplace/pick_place.hpp"
 #include <tf2_eigen/tf2_eigen.h>
+#include <std_srvs/Empty.h>
 
 PickPlaceAction::PickPlaceAction(ros::NodeHandle& nh, std::string name,
                                  std::string arm) :
@@ -28,12 +29,14 @@ PickPlaceAction::PickPlaceAction(ros::NodeHandle& nh, std::string name,
     gripper_tool_frame = "r_gripper_tool_frame";
     sensor_gripper_controller_grab = "r_gripper_sensor_controller/grab";
     sensor_gripper_controller_release = "r_gripper_sensor_controller/release";
+    sensor_gripper_controller_param = "/r_gripper_sensor_controller";
   } else if (arm == "left_arm") {
     wrist_roll_link = "l_wrist_roll_link";
     gripper_controller = "l_gripper_controller/gripper_action";
     gripper_tool_frame = "l_gripper_tool_frame";
     sensor_gripper_controller_grab = "l_gripper_sensor_controller/grab";
     sensor_gripper_controller_release = "l_gripper_sensor_controller/release";
+    sensor_gripper_controller_param = "/l_gripper_sensor_controller";
   } else {
     ROS_ERROR_STREAM("Wrong parameter 'arm'. Given: '" << arm
                      << "' was expecting 'left_arm' or 'right_arm'.");
@@ -76,6 +79,34 @@ void PickPlaceAction::loadParams() {
   ros::param::param(ns_ + "/close_gripper_pos", close_gripper_pos_, 0.00);
   ros::param::param(ns_ + "/close_effort", close_effort_, 50.0);
   ros::param::param(ns_ + "/use_touch_pads", use_touch_pads, true);
+
+  if (use_touch_pads) {
+    ros::param::param(ns_ + "/hardness_gain", hardness_gain, 0.03);
+    ros::param::param(ns_ + "/close_speed", close_speed, 0.02); // m/s
+    ros::param::param(ns_ + "/fingertip_force_limit", fingertip_force_limit,
+                      -1.0);//N
+    ros::param::param(ns_ + "/deformation_limit", deformation_limit, 0.03); // m
+    ros::param::param(ns_ + "/force_lightest", force_lightest, 1.2); // N
+    ros::param::param(ns_ + "/position_open", position_open, 0.07); // m
+
+    // Set parameters
+    ros::param::set(
+      sensor_gripper_controller_param + "/hardness_gain", hardness_gain);
+    ros::param::set(
+      sensor_gripper_controller_param + "/close_speed", close_speed);
+    ros::param::set(
+      sensor_gripper_controller_param + "/fingertip_force_limit",
+      fingertip_force_limit);
+    ros::param::set(
+      sensor_gripper_controller_param + "/deformation_limit", deformation_limit);
+    ros::param::set(
+      sensor_gripper_controller_param + "/force_lightest", force_lightest);
+    ros::param::set(
+      sensor_gripper_controller_param + "/position_open", position_open);
+
+  }
+
+
 
   ROS_INFO_STREAM("Planning time: " << max_planning_time <<
                   ", Adding table: " << (add_table_ ? "True" : "False") <<
@@ -126,6 +157,16 @@ void PickPlaceAction::rosSetup() {
     while (!release_client_->waitForServer(ros::Duration(5.0))) {
       ROS_INFO("Waiting for the r/l_gripper_sensor_controller/release action server to come up");
     }
+    // Send an update to the touchpads to re-read the paramter server.
+    sensor_update_param_service = nh_.serviceClient<std_srvs::Empty>
+                                  (sensor_gripper_controller_param + "/reload_params", true);
+    std_srvs::Empty empty_;
+    if (!sensor_update_param_service.call(empty_)) {
+      ROS_ERROR("Couldn't update the parameters for the touchapds. Will use default");
+    } else {
+      ROS_INFO_STREAM("New params for gripper updated!");
+    }
+
   } else {
     gripper_client_ = new
     actionlib::SimpleActionClient<pr2_controllers_msgs::Pr2GripperCommandAction>(
@@ -565,7 +606,7 @@ bool PickPlaceAction::CheckGripperFinished() {
         ROS_INFO("Release Success");
         return true;
       } else {
-        ROS_INFO("Place Failure");
+        ROS_INFO("Release Failure");
         return false;
       }
     } else {

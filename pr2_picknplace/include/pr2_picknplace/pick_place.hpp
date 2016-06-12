@@ -106,6 +106,13 @@ class PickPlaceAction {
     bool use_touch_pads;
     std::string sensor_gripper_controller_grab;
     std::string sensor_gripper_controller_release;
+    std::string sensor_gripper_controller_param;
+    double hardness_gain;
+    double close_speed;
+    double fingertip_force_limit;
+    double deformation_limit;
+    double force_lightest;
+    double position_open;
 
 
     // Variables
@@ -123,6 +130,7 @@ class PickPlaceAction {
     <pr2_controllers_msgs::Pr2GripperCommandAction>* gripper_client_;
     SensorGrabClient* grab_client_;
     SensorReleaseClient* release_client_;
+    ros::ServiceClient sensor_update_param_service;
 };
 
 namespace picknplace {
