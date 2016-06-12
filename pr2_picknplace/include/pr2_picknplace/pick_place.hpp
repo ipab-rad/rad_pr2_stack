@@ -39,6 +39,7 @@
 // Sensor grasping
 #include <pr2_gripper_sensor_msgs/PR2GripperGrabAction.h>
 #include <pr2_gripper_sensor_msgs/PR2GripperReleaseAction.h>
+#include <pr2_gripper_sensor_msgs/PR2GripperSlipServoAction.h>
 
 // The sensor msgs action aclient typedef
 typedef actionlib::SimpleActionClient<pr2_gripper_sensor_msgs::PR2GripperGrabAction>
@@ -90,6 +91,8 @@ class PickPlaceAction {
     moveit_msgs::CollisionObject deleteObject(std::string object_id);
     bool SensorGrab();
     bool SensorRelease();
+    void gripperSlipCallback(
+        const pr2_gripper_sensor_msgs::PR2GripperSlipServoActionFeedback::Ptr msg);
 
     // Flags
     bool sensor_grabbing;
@@ -124,6 +127,7 @@ class PickPlaceAction {
     moveit::planning_interface::MoveGroup move_group_arm;
     tf2_ros::Buffer tfBuffer;
     tf2_ros::TransformListener tfListener;
+    bool is_gripper_empty;
 
     ros::Publisher pub_co;
     ros::Publisher pub_aco;
@@ -132,6 +136,7 @@ class PickPlaceAction {
     SensorGrabClient* grab_client_;
     SensorReleaseClient* release_client_;
     ros::ServiceClient sensor_update_param_service;
+    ros::Subscriber gripper_slip_sub;
 };
 
 #endif  /* PICK_PLACE_HPP */

@@ -203,5 +203,6 @@ bool GraspManager::sendMoveTo() {
   success &= pickplace_ac_.waitForResult(ros::Duration(max_ac_execution_time));
   success &= pickplace_ac_.getResult()->success;
   request_pc_.call(empty_);
+  ready_to_grasp_ = true;
   return success;
 }

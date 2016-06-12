@@ -21,9 +21,12 @@ int main(int argc, char** argv) {
   while (ros::ok()) {
     ros::spinOnce();
     if (grasp_manager.getGrasp()) {
+      ROS_INFO("Attempting to pick up object!");
       if (grasp_manager.sendPick()) {
+        ROS_INFO("Placing the object!");
         grasp_manager.sendPlace();
       } else {
+        ROS_INFO("Moving out of the way!");
         grasp_manager.sendMoveTo();
       }
     }

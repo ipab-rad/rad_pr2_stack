@@ -123,6 +123,8 @@ void PickPlaceAction::init() {
 
   sensor_grabbing = false;
   sensor_releasing = false;
+
+  is_gripper_empty = true;
 }
 
 void PickPlaceAction::rosSetup() {
@@ -167,6 +169,9 @@ void PickPlaceAction::rosSetup() {
     } else {
       ROS_INFO_STREAM("New params for gripper updated!");
     }
+
+    gripper_slip_sub = nh_.subscribe(sensor_gripper_controller_param +
+                                     "/slip_servo/feedback", 1, &PickPlaceAction::gripperSlipCallback, this);
 
   } else {
     gripper_client_ = new
@@ -389,7 +394,7 @@ bool PickPlaceAction::PickCube(geometry_msgs::PoseStamped ps) {
   if (success) {
     ROS_INFO_STREAM("[PICKPLACEACTION] Executing on the robot ...");
     if (use_touch_pads) {
-      SensorRelease();
+      success &= SensorRelease();
     } else {
       SendGripperCommand(open_gripper_pos_);
     }
@@ -403,7 +408,7 @@ bool PickPlaceAction::PickCube(geometry_msgs::PoseStamped ps) {
     ros::WallDuration(exec_wait_).sleep();
 
     if (use_touch_pads) {
-      SensorGrab();
+      success &= SensorGrab();
     } else {
       SendGripperCommand(close_gripper_pos_, close_effort_);
     }
@@ -413,7 +418,10 @@ bool PickPlaceAction::PickCube(geometry_msgs::PoseStamped ps) {
     ros::WallDuration(0.1).sleep();  // Gripper delay for better grippage
 
     if (success) { success &= move_group_arm.execute(postgrasp_plan); }
-    ROS_INFO_STREAM("[PICKPLACEACTION] MoveIt execution of plan: "
+    if (is_gripper_empty) ROS_WARN("gripper empty");
+    if (success) { success &= !is_gripper_empty; }
+
+    ROS_INFO_STREAM("[PICKPLACEACTION] MoveIt execution of pickup plan: "
                     << ((success) ? "success" : "fail"));
   } else {
     ROS_INFO_STREAM("[PICKPLACEACTION] Failed to find a plan for pose: "
@@ -517,7 +525,7 @@ bool PickPlaceAction::PlaceCube(geometry_msgs::PoseStamped ps) {
     ros::WallDuration(exec_wait_).sleep();
 
     if (use_touch_pads) {
-      SensorRelease();
+      success &= SensorRelease();
     } else {
       SendGripperCommand(open_gripper_pos_);
     }
@@ -525,7 +533,7 @@ bool PickPlaceAction::PlaceCube(geometry_msgs::PoseStamped ps) {
     if (success) { success &= CheckGripperFinished(); }
 
     if (success) { success &= move_group_arm.execute(postplace_plan); }
-    ROS_INFO_STREAM("[PICKPLACEACTION] MoveIt execution of plan: "
+    ROS_INFO_STREAM("[PICKPLACEACTION] MoveIt execution of place plan: "
                     << ((success) ? "success" : "fail"));
   } else {
     ROS_INFO_STREAM("[PICKPLACEACTION] Failed to find a plan for pose: "
@@ -537,7 +545,60 @@ bool PickPlaceAction::PlaceCube(geometry_msgs::PoseStamped ps) {
 
 bool PickPlaceAction::MoveTo(geometry_msgs::PoseStamped ps) {
   moveit::planning_interface::MoveGroup::Plan moveto_plan;
-  geometry_msgs::Pose p = ps.pose;
+  // Do magic transforms here
+
+  std::string pr2_frame = move_group_arm.getPlanningFrame();
+  pr2_frame.erase(0, 1);
+
+  geometry_msgs::TransformStamped transform;
+  try {
+    Eigen::Translation3d t0;
+    t0 = Eigen::Translation3d(ps.pose.position.x,
+                              ps.pose.position.y,
+                              ps.pose.position.z);
+
+    // Tabletop to OdomCombined transformation
+    Eigen::Affine3d t1 =
+      tf2::transformToEigen(tfBuffer.lookupTransform(pr2_frame,
+                                                     ps.header.frame_id,
+                                                     ros::Time(0)));
+    // Rotate Gripper 90 deg in Y axis
+    Eigen::Affine3d t2;
+    t2 = Eigen::AngleAxisd(0.5 * M_PI,  Eigen::Vector3d::UnitY());
+
+    // ToolFrame to WristFrame transformation
+    Eigen::Affine3d t3 =
+      tf2::transformToEigen(tfBuffer.lookupTransform(wrist_roll_link,
+                                                     gripper_tool_frame,
+                                                     ros::Time(0)));
+
+    Eigen::Affine3d t = t1 * t0 * t2 * t0.inverse();
+
+    ROS_INFO_STREAM("T3:\n" << t3.matrix());
+
+    transform.transform.translation.x = t.translation().x();
+    transform.transform.translation.y = t.translation().y();
+    transform.transform.translation.z = t.translation().z();
+
+    Eigen::Quaterniond q(t.rotation());
+    transform.transform.rotation.x = q.x();
+    transform.transform.rotation.y = q.y();
+    transform.transform.rotation.z = q.z();
+    transform.transform.rotation.w = q.w();
+  } catch (tf2::TransformException& ex) {
+    ROS_ERROR("%s", ex.what());
+  }
+
+  geometry_msgs::PoseStamped pso;
+  try { tf2::doTransform(ps, pso, transform); }
+  catch (tf2::TransformException ex) {
+    ROS_ERROR("%s", ex.what());
+    return false;
+  }
+  geometry_msgs::Pose p = pso.pose;
+  p.position.z += 0.1;
+  // End tfs
+
   moveit::core::RobotState moveto_robot_state = RobotStateFromPose(p);
 
   bool success = Plan(*move_group_arm.getCurrentState(),
@@ -548,6 +609,9 @@ bool PickPlaceAction::MoveTo(geometry_msgs::PoseStamped ps) {
   if (success) {
     ROS_INFO_STREAM("[PICKPLACEACTION] Executing on the robot ...");
     success &= move_group_arm.execute(moveto_plan);
+    if (!success) {
+      ROS_WARN("Failed execution on the robot of MoveTo.");
+    }
     ros::WallDuration(exec_wait_).sleep();
   } else {
     ROS_INFO_STREAM("[PICKPLACEACTION] Failed to find a plan for pose: "
@@ -616,8 +680,13 @@ bool PickPlaceAction::CheckGripperFinished() {
       sensor_grabbing = false;
       grab_client_->waitForResult(ros::Duration(max_planning_time));
       if (grab_client_->getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
-        ROS_INFO("Successfully completed Grab");
-        return true;
+        bool success = true;
+        // grab_client_->getResult()->data.rtstate.realtime_controller_state ==
+        // pr2_gripper_sensor_msgs::PR2GripperSensorRTState::FORCE_SERVO;
+        std::cout << "Gripper response msg: " <<
+                  *grab_client_->getResult() << std::endl;
+        ROS_INFO("Completed Grab with status: %s!", (success) ? "success" : "fail");
+        return success;
       } else {
         ROS_INFO("Grab Failed");
         return false;
@@ -678,6 +747,14 @@ bool PickPlaceAction::SensorRelease() {
   sensor_releasing = true;
   return true;
 }
+
+void PickPlaceAction::gripperSlipCallback(
+  const pr2_gripper_sensor_msgs::PR2GripperSlipServoActionFeedback::Ptr msg) {
+  if (!is_gripper_empty && msg->feedback.data.gripper_empty)
+    ROS_WARN("I dropped the object!!!");
+  is_gripper_empty = msg->feedback.data.gripper_empty;
+}
+
 
 moveit_msgs::CollisionObject PickPlaceAction::deleteObject(
   std::string object_id) {

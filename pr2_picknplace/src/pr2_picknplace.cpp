@@ -13,7 +13,7 @@
 int main(int argc, char** argv) {
   ros::init(argc, argv, "pr2_picknplace");
   ros::NodeHandle nh("~");
-  ros::AsyncSpinner spinner(2);
+  ros::AsyncSpinner spinner(4);
   spinner.start();
 
   std::string arm;
