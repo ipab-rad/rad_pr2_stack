@@ -9,6 +9,7 @@
 #include "pr2_picknplace/pick_place.hpp"
 #include <tf2_eigen/tf2_eigen.h>
 #include <std_srvs/Empty.h>
+#include <pr2_picknplace_msgs/PicknPlaceGoal.h>
 
 PickPlaceAction::PickPlaceAction(ros::NodeHandle& nh, std::string name,
                                  std::string arm) :
@@ -214,13 +215,13 @@ void PickPlaceAction::executeCB() {
   ps.pose.position.z += 0.015;  // Temporary fix until better transformation
 
   switch (pick_place_goal_.request) {
-    case picknplace::REQUEST_PICK:
+    case pr2_picknplace_msgs::PicknPlaceGoal::PICK_REQUEST: //picknplace::REQUEST_PICK:
       PickCube(ps);
       break;
-    case picknplace::REQUEST_PLACE:
+    case pr2_picknplace_msgs::PicknPlaceGoal::PLACE_REQUEST:
       PlaceCube(ps);
       break;
-    case picknplace::REQUEST_MOVE:
+    case pr2_picknplace_msgs::PicknPlaceGoal::MOVE_REQUEST:
       ROS_WARN("Move Request not implemented yet.");
       break;
   }

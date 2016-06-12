@@ -7,6 +7,7 @@
  */
 
 #include <pr2_grasp_manager/grasp_manager.hpp>
+#include <pr2_picknplace_msgs/PicknPlaceGoal.h>
 
 #include <cmath>
 
@@ -131,7 +132,7 @@ void GraspManager::sendPick() {
     ROS_INFO("Picking!");
     ready_to_pick_ = false;
     pr2_picknplace_msgs::PickPlaceGoal pick;
-    pick.goal.request = 0;
+    pick.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::PICK_REQUEST;
     pick.goal.header.frame_id = "base_link";
     pick.goal.header.stamp = ros::Time::now();
     pick.goal.object_pose.position = grasp_res_.averagedGraspPoint;
@@ -165,7 +166,7 @@ void GraspManager::sendPlace() {
     ROS_INFO("Placing!");
     ready_to_place_ = false;
     pr2_picknplace_msgs::PickPlaceGoal place;
-    place.goal.request = 1;
+    place.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::PLACE_REQUEST;
     place.goal.header.frame_id = "base_link";
     place.goal.header.stamp = ros::Time::now();
     place.goal.object_pose = place_pose_;

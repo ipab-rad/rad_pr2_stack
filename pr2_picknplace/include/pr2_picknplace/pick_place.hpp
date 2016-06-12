@@ -133,12 +133,4 @@ class PickPlaceAction {
     ros::ServiceClient sensor_update_param_service;
 };
 
-namespace picknplace {
-enum request {
-    REQUEST_PICK = 0,
-    REQUEST_PLACE = 1,
-    REQUEST_MOVE = 2
-};
-};
-
 #endif  /* PICK_PLACE_HPP */
