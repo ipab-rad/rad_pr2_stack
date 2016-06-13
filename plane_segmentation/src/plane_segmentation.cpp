@@ -45,15 +45,15 @@
 #include <Eigen/Dense>
 
 // Colour params
-unsigned char colour_r_min;
-unsigned char colour_r_max;
+unsigned char colour_gray_min;
+unsigned char colour_gray_max;
 unsigned char colour_g_min;
 unsigned char colour_g_max;
 unsigned char colour_b_min;
 unsigned char colour_b_max;
 
-unsigned char colour_r_min_new;
-unsigned char colour_r_max_new;
+unsigned char colour_gray_min_new;
+unsigned char colour_gray_max_new;
 unsigned char colour_g_min_new;
 unsigned char colour_g_max_new;
 unsigned char colour_b_min_new;
@@ -139,6 +139,10 @@ double mean_to_point_dist(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr
     return (centroid - point).norm();
 }
 
+double rgb2gray(const pcl::PointXYZRGB& p) {
+    return double(p.r + p.g + p.b) / 3.0;
+}
+
 void update_params(bool& should_update) {
     if (!should_update) return;
     segment_objects = segment_objects_new;
@@ -153,12 +157,8 @@ void update_params(bool& should_update) {
     colour_filtering = colour_filtering_new;
     publish_planes = publish_planes_new;
     publish_outliers = publish_outliers_new;
-    colour_r_min = colour_r_min_new;
-    colour_r_max = colour_r_max_new;
-    colour_g_min = colour_g_min_new;
-    colour_g_max = colour_g_max_new;
-    colour_b_min = colour_b_min_new;
-    colour_b_max = colour_b_max_new;
+    colour_gray_min = colour_gray_min_new;
+    colour_gray_max = colour_gray_max_new;
     euclidean_clustering = euclidean_clustering_new;
     prefiltering = prefiltering_new;
     postfiltering_segmented = postfiltering_segmented_new;
@@ -343,41 +343,18 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
 
         if (colour_filtering && objects->size() > 0) {
             s_ros = ros::Time::now();
-            pcl::ConditionAnd<pcl::PointXYZRGB>::Ptr range_cond(
-                new pcl::ConditionAnd<pcl::PointXYZRGB>());
-            range_cond->addComparison(
-                pcl::PackedRGBComparison<pcl::PointXYZRGB>::ConstPtr(
-                    new pcl::PackedRGBComparison<pcl::PointXYZRGB>("r", pcl::ComparisonOps::GE,
-                                                                   colour_r_min)));
-            range_cond->addComparison(
-                pcl::PackedRGBComparison<pcl::PointXYZRGB>::ConstPtr(
-                    new pcl::PackedRGBComparison<pcl::PointXYZRGB>("r", pcl::ComparisonOps::LE,
-                                                                   colour_r_max)));
-            range_cond->addComparison(
-                pcl::PackedRGBComparison<pcl::PointXYZRGB>::ConstPtr(
-                    new pcl::PackedRGBComparison<pcl::PointXYZRGB>("g", pcl::ComparisonOps::GE,
-                                                                   colour_g_min)));
-            range_cond->addComparison(
-                pcl::PackedRGBComparison<pcl::PointXYZRGB>::ConstPtr(
-                    new pcl::PackedRGBComparison<pcl::PointXYZRGB>("g", pcl::ComparisonOps::LE,
-                                                                   colour_g_max)));
-            range_cond->addComparison(
-                pcl::PackedRGBComparison<pcl::PointXYZRGB>::ConstPtr(
-                    new pcl::PackedRGBComparison<pcl::PointXYZRGB>("b",
-                                                                   pcl::ComparisonOps::GE,
-                                                                   colour_b_min)));
-            range_cond->addComparison(
-                pcl::PackedRGBComparison<pcl::PointXYZRGB>::ConstPtr(
-                    new pcl::PackedRGBComparison<pcl::PointXYZRGB>("b", pcl::ComparisonOps::LE,
-                                                                   colour_b_max)));
-            // build the filter
-            pcl::ConditionalRemoval<pcl::PointXYZRGB> condrem;
-            condrem.setCondition(range_cond);
-            condrem.setInputCloud(objects);
+            pcl::PointIndices::Ptr idxs (new pcl::PointIndices ());
+            // iota(idxs->indices.begin(), idxs->indices.end(), 0);
 
-            // condrem.setIndices(inliers); // TEST: JUST FOR TESTING REMOVE AFTER COMPILING
-            condrem.setKeepOrganized(false); //was true
-            condrem.filter(*objects);
+            for (int i = 0; i < objects->size(); ++i) {
+                double gray = rgb2gray(objects->points[i]);
+                if (gray >= colour_gray_min && gray <= colour_gray_max)
+                    idxs->indices.push_back(i);
+            }
+            extract.setInputCloud(objects);
+            extract.setIndices(idxs);
+            extract.setNegative(false);
+            extract.filter(*objects);
 
             e_ros = ros::Time::now();
             ROS_INFO(">> CPU Time colour filtering: %.2fms.",
@@ -474,36 +451,6 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
         // End thresholding
     }
 
-    // // TODO: Creating the KdTree object for the search method of the extraction
-    // pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(new pcl::search::KdTree<pcl::PointXYZ>);
-    // tree->setInputCloud(cloud_filtered);
-
-    // std::vector<pcl::PointIndices> cluster_indices;
-    // pcl::EuclideanClusterExtraction<pcl::PointXYZ> ec;
-    // ec.setClusterTolerance(0.02); // 2cm
-    // ec.setMinClusterSize(100);
-    // ec.setMaxClusterSize(25000);
-    // ec.setSearchMethod(tree);
-    // ec.setInputCloud(cloud_filtered);
-    // ec.extract(cluster_indices);
-
-    // int j = 0;
-    // for(std::vector<pcl::PointIndices>::const_iterator it = cluster_indices.begin(); it != cluster_indices.end(); ++it)
-    // {
-    //   pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_cluster(new pcl::PointCloud<pcl::PointXYZ>);
-    //   for(std::vector<int>::const_iterator pit = it->indices.begin(); pit != it->indices.end(); ++pit)
-    //     cloud_cluster->points.push_back(cloud_filtered->points[*pit]); //*
-    //   cloud_cluster->width = cloud_cluster->points.size();
-    //   cloud_cluster->height = 1;
-    //   cloud_cluster->is_dense = true;
-
-    //   std::cout << "PointCloud representing the Cluster: " << cloud_cluster->points.size() << " data points." << std::endl;
-    //   std::stringstream ss;
-    //   ss << "cloud_cluster_" << j << ".pcd";
-    //   writer.write<pcl::PointXYZ>(ss.str(), *cloud_cluster, false); //*
-    //   j++;
-    // }
-
     s_ros = ros::Time::now();
     pcl::PCLPointCloud2 segmented_pcl, outliers_pcl;
     sensor_msgs::PointCloud2 segmented, segmented_outliers;
@@ -550,12 +497,8 @@ void dynamic_recongifure_callback(
     colour_filtering_new = config.colour_filtering;
     publish_planes_new = config.publish_planes;
     publish_outliers_new = config.publish_outliers;
-    colour_r_min_new = config.colour_r_min;
-    colour_r_max_new = config.colour_r_max;
-    colour_g_min_new = config.colour_g_min;
-    colour_g_max_new = config.colour_g_max;
-    colour_b_min_new = config.colour_b_min;
-    colour_b_max_new = config.colour_b_max;
+    colour_gray_min_new = config.colour_gray_min;
+    colour_gray_max_new = config.colour_gray_max;
     euclidean_clustering_new = config.euclidean_clustering;
     prefiltering_new = config.prefiltering;
     postfiltering_segmented_new = config.postfiltering_segmented;
@@ -591,16 +534,6 @@ bool request_pointcloud_callback(
 int main(int argc, char** argv) {
     ros::init(argc, argv, "plane_segmentation");
     ros::NodeHandle nh("~");
-
-    // Load params
-    // nh.param<bool>("segment_objects", segment_objects, true);
-    // nh.param<bool>("advanced_filter", advanced_filter, false);
-    // nh.param<float>("leaf_size_m", leaf_size_m, 0.0015);
-    // nh.param<float>("plane_threshold_m", plane_threshold_m, 0.005);
-    // nh.param<float>("simple_threshold_z_plane_height_min",
-    //                 simple_threshold_z_plane_height_min, 0.7f);
-    // nh.param<float>("simple_threshold_z_plane_height_max",
-    //                 simple_threshold_z_plane_height_max, 3.0f);
 
     dynamic_reconfigure::Server<plane_segmentation::PlaneSegmentationParamsConfig>
     server;
