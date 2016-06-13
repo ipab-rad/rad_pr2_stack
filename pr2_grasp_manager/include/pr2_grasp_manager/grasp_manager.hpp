@@ -69,6 +69,7 @@ class GraspManager {
 	haf_grasping::GraspOutput grasp_res_;
 	haf_grasping::CalcGraspPointsServerActionGoal goal_;
 	geometry_msgs::Pose place_pose_;
+	geometry_msgs::Pose moveto_pose_;
 
 	int eval_thresh;
 

@@ -232,15 +232,16 @@ void PickPlaceAction::executeCB() {
       break;
   }
 
+  result_.success = success;
   if (success) {
-    result_.success = true;
-    ROS_INFO("[PICKPLACEACTION] %s: Succeeded!", action_name_.c_str());
-    as_.setSucceeded(result_);
+    ROS_INFO("[PICKPLACEACTION] %s: Succeeded! For action: %d.",
+             action_name_.c_str(), pick_place_goal_.request);
   } else {
-    result_.success = false;
-    ROS_INFO("[PICKPLACEACTION] %s: Failed!", action_name_.c_str());
-    as_.setSucceeded(result_);
+    // result_.success = false;
+    ROS_INFO("[PICKPLACEACTION] %s: Failed! For action: %d.",
+             action_name_.c_str(), pick_place_goal_.request);
   }
+  as_.setSucceeded(result_);
 }
 
 void PickPlaceAction::AddCollisionObjs() {
@@ -417,7 +418,10 @@ bool PickPlaceAction::PickCube(geometry_msgs::PoseStamped ps) {
 
     ros::WallDuration(0.1).sleep();  // Gripper delay for better grippage
 
-    if (success) { success &= move_group_arm.execute(postgrasp_plan); }
+    if (success) {
+      ROS_INFO("Executing postgrasp plan");
+      success &= move_group_arm.execute(postgrasp_plan);
+    }
     if (is_gripper_empty) ROS_WARN("gripper empty");
     if (success) { success &= !is_gripper_empty; }
 

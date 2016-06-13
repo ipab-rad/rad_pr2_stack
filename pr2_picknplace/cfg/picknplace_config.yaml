@@ -9,9 +9,9 @@ close_gripper_pos: 0.01
 close_effort: 100.0
 
 # pr2_gripper_sensor_action params
-hardness_gain: 0.03
-close_speed: 0.05 # m/s
-fingertip_force_limit: -1 # N
+hardness_gain: 0.08
+close_speed: 0.03 # m/s
+fingertip_force_limit: 10.0 # N
 deformation_limit: 0.03 # m
-force_lightest: 1.3 # N
-position_open: 0.08 # m
+force_lightest: 2.5 # N
+position_open: 0.06 # m
