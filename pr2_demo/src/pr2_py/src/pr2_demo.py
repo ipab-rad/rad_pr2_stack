@@ -134,7 +134,8 @@ def add_scene_object(name = 'ros_hydro', obj_type = 'box',
         sc.add_box(name,pose,size)
 
 
-def get_manip_pose(obj, pub, dim, grip_len = 0.21):
+def get_manip_pose(obj, pub, dim, grip_len = 0.21, origin_offset = (0,0.05,0),
+                  ax = 4):
     marker_array = MarkerArray()
     poses = PoseArray()
     poses.header.frame_id = obj
@@ -144,69 +145,88 @@ def get_manip_pose(obj, pub, dim, grip_len = 0.21):
     col = (0.3, 0.1, 0.0)
 
     # Pointing towards the origin
-    Right = (-1.,0.,0.)
-    Left = (1.,0.,0.)
-    Top = (0.,-1.,0.)
-    Bottom = (0.,1.,0.)
-    Top_Right = (-1.,-1.,0.)
-    Bottom_Left =(1.,1.,0.)
-    Top_Left = (1.,-1.,0.)
-    Bottom_Right =(-1.,1.,0.)
-    Z_C_P = (0.,0.,-1.)
-    Z_C_N = (0.,0.,1.)
+    Right_Orient = (-1.,0.,0.)
+    Left_Orient = (1.,0.,0.)
+    Top_Orient = (0.,-1.,0.)
+    Bottom_Orient = (0.,1.,0.)
+    Top_Right_Orient = (-1.,-1.,0.)
+    Bottom_Left_Orient =(1.,1.,0.)
+    Top_Left_Orient = (1.,-1.,0.)
+    Bottom_Right_Orient =(-1.,1.,0.)
+    Z_C_P_Orient = (0.,0.,-1.)
+    Z_C_N_Orient = (0.,0.,1.)
 
     # TODO: Add option for when gripper does need to face object (i.e. grip_len = 0)
-    C_R_Pos = ((dim[0]/2) + grip_len, 0, 0)
-    C_L_Pos = (-((dim[0]/2) + grip_len), 0, 0)
-    C_T_Pos = (0, (dim[1]/2) + grip_len, 0)
-    C_B_Pos = (0, -((dim[1]/2) + grip_len), 0)
-    C_Z_F_Pos = (0,0,((dim[2]/2) + grip_len))
-    C_Z_B_Pos = (0,0,-((dim[2]/2) + grip_len))
+    # dim = tuple([sum(x) for x in zip(dim, origin_offset)])
+    C_R_Pos = ((dim[0]/2) + grip_len + origin_offset[0],
+               0 + origin_offset[1],
+               0 + origin_offset[2])
+    C_L_Pos = (-((dim[0]/2) + grip_len) + origin_offset[0],
+               0 + origin_offset[1],
+               0 + origin_offset[2])
+    C_T_Pos = (0 + origin_offset[0],
+               (dim[1]/2) + grip_len + origin_offset[1],
+               0 + origin_offset[2])
+    C_B_Pos = (0 + origin_offset[0],
+               -((dim[1]/2) + grip_len) + origin_offset[1],
+               0 + origin_offset[2])
+    C_Z_F_Pos = (0 + origin_offset[0],
+                 0 + origin_offset[1],
+                 ((dim[2]/2) + grip_len) + origin_offset[2])
+    C_Z_B_Pos = (0 + origin_offset[0],
+                 0 + origin_offset[1],
+                 -((dim[2]/2) + grip_len) + origin_offset[2])
 
 
     # rospy.loginfo(C_R_Pos + Right)
     # rospy.loginfo(C_L_Pos + Left)
 
-    for i in range(1,3):
-        if i == 1:
-            pose_target = pose_from_vector3D((C_R_Pos + Right))
-            # rospy.loginfo("Right-X")
-        elif i == 2:
-            pose_target = pose_from_vector3D((C_L_Pos + Left))
-            # rospy.loginfo("Left-X")
-        else:
-            rospy.loginfo("Error in manip loop")
-
+    for i in range(1 + ax,3 + ax):
         # if i == 1:
-        #     pose_target = pose_from_vector3D ((0.31,0,-0.07,-1,0,0))
-        #     rospy.loginfo("Right-X")
+        #     pose_target = pose_from_vector3D((C_R_Pos + Right))
+        #     # rospy.loginfo("Right-X")
         # elif i == 2:
-        #     pose_target = pose_from_vector3D((-0.32,0,-0.07,1,0,0))
-        #     rospy.loginfo("Left-X")
-        # elif i == 3:
-        #     pose_target = pose_from_vector3D ((0,0.36,-0.07,0,-1,0))
-        #     rospy.loginfo("Right-Y")
-        # elif i == 4:
-        #     pose_target = pose_from_vector3D((0,-0.36,-0.07,0,1,0))
-        #     rospy.loginfo("Left-Y")
-        # elif i == 5:
-        #     pose_target = pose_from_vector3D ((0.31,0.34,-0.07,-1,-1,0))
-        #     rospy.loginfo("Top-Right-Diag")
-        # elif i == 6:
-        #     pose_target = pose_from_vector3D((-0.32,-0.34,-0.07,1,1,0))
-        #     rospy.loginfo("Bottom-Left-Diag")
-        # elif i == 7:
-        #     pose_target = pose_from_vector3D ((-0.32,0.34,-0.07,1,-1,0))
-        #     rospy.loginfo("Top-Left-Diag")
-        # elif i == 8:
-        #     pose_target = pose_from_vector3D((0.31,-0.34,-0.07,-1,1,0))
-        #     rospy.loginfo("Bottom-Right-Diag")
-        # elif i == 9:
-        #     pose_target = pose_from_vector3D ((0,0,0.2,0,0,-1))
-        #     rospy.loginfo("Z-Center-Pos")
-        # elif i == 10:
-        #     pose_target = pose_from_vector3D((0,0,-0.2,0,0,1))
-        #     rospy.loginfo("Z-Center-Neg")
+        #     pose_target = pose_from_vector3D((C_L_Pos + Left))
+        #     # rospy.loginfo("Left-X")
+        # else:
+        #     rospy.loginfo("Error in manip loop")
+
+        if i == 1:
+            pose_target = pose_from_vector3D ((C_R_Pos + Right_Orient))
+            rospy.loginfo("Right-X")
+        elif i == 2:
+            pose_target = pose_from_vector3D((C_L_Pos + Left_Orient))
+            rospy.loginfo("Left-X")
+        elif i == 3:
+            pose_target = pose_from_vector3D ((C_T_Pos + Top_Orient))
+            rospy.loginfo("Top-Y")
+        elif i == 4:
+            pose_target = pose_from_vector3D((C_B_Pos + Bottom_Orient))
+            rospy.loginfo("Left-Y")
+        elif i == 5:
+            pos = tuple([sum(x) for x in zip(C_R_Pos , C_T_Pos)])
+            pose_target = pose_from_vector3D ((pos + Top_Right_Orient))
+            rospy.loginfo("Top-Right-Diag")
+        elif i == 6:
+            pos = tuple( [sum(x) for x in zip(C_L_Pos + C_B_Pos)] )
+            pose_target = pose_from_vector3D ((pos + Bottom_Left_Orient))
+            rospy.loginfo("Bottom-Left-Diag")
+        elif i == 7:
+            pos = tuple( [sum(x) for x in zip(C_L_Pos + C_T_Pos)] )
+            pose_target = pose_from_vector3D ((pos + Top_Left_Orient))
+            rospy.loginfo("Top-Left-Diag")
+        elif i == 8:
+            pos = tuple( [sum(x) for x in zip(C_R_Pos + C_B_Pos)] )
+            pose_target = pose_from_vector3D ((pos + Bottom_Right_Orient))
+            rospy.loginfo("Bottom-Right-Diag")
+        elif i == 9:
+            # pos = [sum(x) for x in zip()]
+            pose_target = pose_from_vector3D ((C_Z_F_Pos + Z_C_P_Orient ))
+            rospy.loginfo("Z-Center-Pos")
+        elif i == 10:
+            # pos = [sum(x) for x in zip()]
+            pose_target = pose_from_vector3D ((C_Z_B_Pos + Z_C_N_Orient))
+            rospy.loginfo("Z-Center-Neg")
 
         if i % 2 == 0:
             col = [x + 0.2 for x in col]
@@ -221,8 +241,6 @@ def get_manip_pose(obj, pub, dim, grip_len = 0.21):
     pub.publish(marker_array)
 
     # rospy.loginfo(len(marker_array.markers))
-
-
     return poses
 
 
@@ -266,8 +284,10 @@ def pick_n_place():
     r_gripper = Gripper('r')
     l_gripper = Gripper('l')
 
-    object_id = 'ros_hydro'
-    object_dim = (0.23,0.28,0.03)
+    # object_id = 'ros_hydro'
+    # object_dim = (0.23,0.28,0.03)
+    object_id = 'nuc'
+    object_dim = (0.125,0.1,0.14)
 
     point_cloud_offset_z = 0.05
     approach_dist = 0.022
@@ -292,107 +312,38 @@ def pick_n_place():
             # l_gripper.openGripper()
 
             pose_array = get_manip_pose(object_id, markerArray_pub, object_dim)
+            rospy.sleep(1)
 
-            p1 = PoseStamped()
-            p1.header = pose_array.header
-
-            p1.pose = pose_array.poses[0]
-            p1.pose.position.z -= point_cloud_offset_z
-            p1.pose.position.x -= 0.03
-            r_goal = tf2_geometry_msgs.do_transform_pose(p1,trans)
-
-
-            p2 = PoseStamped()
-            p2.header = pose_array.header
-
-            p2.pose = pose_array.poses[1]
-            p2.pose.position.z -= point_cloud_offset_z
-            p2.pose.position.x += 0.01
-            l_goal = tf2_geometry_msgs.do_transform_pose(p2,trans)
-
-            dual_arm.set_goal_tolerance(0.01)
-            dual_arm.set_pose_target(r_goal, 'r_wrist_roll_link')
-            dual_arm.set_pose_target(l_goal, 'l_wrist_roll_link')
-            dual_arm.set_start_state_to_current_state()
-            dual_arm.plan()
-            rospy.sleep(3)
-            dual_arm.go(wait=True)
-            rospy.sleep(2)
-
-
-            #approach object
-            p1.pose.position.x -= approach_dist
-            p2.pose.position.x += approach_dist
-
-            r_goal = tf2_geometry_msgs.do_transform_pose(p1,trans)
-            l_goal = tf2_geometry_msgs.do_transform_pose(p2,trans)
-
-            dual_arm.set_pose_target(r_goal, 'r_wrist_roll_link')
-            dual_arm.set_pose_target(l_goal, 'l_wrist_roll_link')
-            dual_arm.set_start_state_to_current_state()
-            dual_arm.plan()
-            rospy.sleep(3)
-            dual_arm.go(wait=True)
-            rospy.sleep(2)
-
-
-            # Constraints
-            constraints = Constraints()
-            constraints.name = 'Dual-Arm Constraints'
-
-            # Create an orientation constraint for the right gripper
-            r_grip_const = dual_arm.get_current_pose('r_wrist_roll_link')
-            r_grip_oc = OrientationConstraint()
-            r_grip_oc.header = r_grip_const.header
-            r_grip_oc.link_name = 'r_wrist_roll_link'
-            r_grip_oc.orientation = p1.pose.orientation
-            r_grip_oc.absolute_x_axis_tolerance = 10
-            r_grip_oc.absolute_y_axis_tolerance = 10
-            r_grip_oc.absolute_z_axis_tolerance = 10
-            r_grip_oc.weight = 0.1
-            constraints.orientation_constraints.append(r_grip_oc)
-
-            # Create an orientation constraint for the left gripper
-            l_grip_const = dual_arm.get_current_pose('l_wrist_roll_link')
-            l_grip_oc = OrientationConstraint()
-            l_grip_oc.header = l_grip_const.header
-            l_grip_oc.link_name = 'l_wrist_roll_link'
-            l_grip_oc.orientation = p2.pose.orientation
-            l_grip_oc.absolute_x_axis_tolerance = 10
-            l_grip_oc.absolute_y_axis_tolerance = 10
-            l_grip_oc.absolute_z_axis_tolerance = 10
-            l_grip_oc.weight = 0.1
-            # Append the constraint to the list of contraints
-            constraints.orientation_constraints.append(l_grip_oc)
-            # dual_arm.set_path_constraints(constraints)
-
-            r_grip_const.pose.position.z += 0.15
-            dual_arm.set_pose_target(r_grip_const, 'r_wrist_roll_link')
-
-            l_grip_const.pose.position.z += 0.15
-            dual_arm.set_pose_target(l_grip_const, 'l_wrist_roll_link')
-
-
-
-            dual_arm.plan()
-            rospy.sleep(4)
-            dual_arm.go(wait = True)
-
-            dual_arm.clear_pose_targets()
-            dual_arm.clear_path_constraints()
-
-
-            # rospy.loginfo("2 =================================================")
-            # #TODO: Need to update to current pose before approach object
-            # dual_arm.set_pose_reference_frame(object_id)
+            # p1 = PoseStamped()
+            # p1.header = pose_array.header
             #
-            # pt1 = dual_arm.get_current_pose('r_wrist_roll_link')
-            # p1.pose = pt1.pose
-            # p1.pose.position.x -= 0.002
+            # p1.pose = pose_array.poses[0]
+            # p1.pose.position.z -= point_cloud_offset_z
+            # p1.pose.position.x -= 0.03
+            # r_goal = tf2_geometry_msgs.do_transform_pose(p1,trans)
             #
-            # pt2 = dual_arm.get_current_pose('l_wrist_roll_link')
-            # p2.pose = pt2.pose
-            # p2.pose.position.x += 0.002
+            #
+            # p2 = PoseStamped()
+            # p2.header = pose_array.header
+            #
+            # p2.pose = pose_array.poses[1]
+            # p2.pose.position.z -= point_cloud_offset_z
+            # p2.pose.position.x += 0.01
+            # l_goal = tf2_geometry_msgs.do_transform_pose(p2,trans)
+            #
+            # dual_arm.set_goal_tolerance(0.01)
+            # dual_arm.set_pose_target(r_goal, 'r_wrist_roll_link')
+            # dual_arm.set_pose_target(l_goal, 'l_wrist_roll_link')
+            # dual_arm.set_start_state_to_current_state()
+            # dual_arm.plan()
+            # rospy.sleep(3)
+            # dual_arm.go(wait=True)
+            # rospy.sleep(2)
+            #
+            #
+            # #approach object
+            # p1.pose.position.x -= approach_dist
+            # p2.pose.position.x += approach_dist
             #
             # r_goal = tf2_geometry_msgs.do_transform_pose(p1,trans)
             # l_goal = tf2_geometry_msgs.do_transform_pose(p2,trans)
@@ -404,74 +355,144 @@ def pick_n_place():
             # rospy.sleep(3)
             # dual_arm.go(wait=True)
             # rospy.sleep(2)
-
-
-
-            ## Rotate object
-
-            r_rpy = dual_arm.get_current_rpy('r_wrist_roll_link')
-            r_quat = tf.transformations.quaternion_from_euler(-1, r_rpy[1], r_rpy[2])
-            rospy.loginfo(r_quat)
-            r_grip_const.pose.orientation = Quaternion(r_quat[0],r_quat[1],
-                                                       r_quat[2],r_quat[3])
-            dual_arm.set_pose_target(r_grip_const, 'r_wrist_roll_link')
-
-
-            l_rpy = dual_arm.get_current_rpy('l_wrist_roll_link')
-            l_quat = tf.transformations.quaternion_from_euler(1, l_rpy[1], l_rpy[2])
-            l_grip_const.pose.orientation = Quaternion(l_quat[0],l_quat[1],
-                                                       l_quat[2],l_quat[3])
-            dual_arm.set_pose_target(l_grip_const, 'l_wrist_roll_link')
-
-
-            dual_arm.plan()
-            rospy.sleep(4)
-            dual_arm.go(wait = True)
-            rospy.sleep(4)
-
-
-
-            dual_arm.set_pose_reference_frame(object_id)
-
-
-
-            dual_arm.shift_pose_target(0, 0.05,'r_wrist_roll_link')
-            dual_arm.shift_pose_target(0, 0.05,'l_wrist_roll_link')
-            dual_arm.plan()
-            rospy.sleep(1)
-            dual_arm.go(wait = True)
-            rospy.sleep(1)
-
-            dual_arm.shift_pose_target(1, 0.05,'r_wrist_roll_link')
-            dual_arm.shift_pose_target(1, 0.05,'l_wrist_roll_link')
-            dual_arm.plan()
-            rospy.sleep(1)
-            dual_arm.go(wait = True)
-            rospy.sleep(1)
-
-
-            dual_arm.shift_pose_target(0, -0.05,'r_wrist_roll_link')
-            dual_arm.shift_pose_target(0, -0.05,'l_wrist_roll_link')
-            dual_arm.plan()
-            rospy.sleep(1)
-            dual_arm.go(wait = True)
-            rospy.sleep(1)
-
-            dual_arm.shift_pose_target(1, -0.05,'r_wrist_roll_link')
-            dual_arm.shift_pose_target(1, -0.05,'l_wrist_roll_link')
-            dual_arm.plan()
-            rospy.sleep(1)
-            dual_arm.go(wait = True)
-            rospy.sleep(1)
-
-            #TODO: Do circles with the object
-
-
-
+            #
+            #
+            # # Constraints
+            # constraints = Constraints()
+            # constraints.name = 'Dual-Arm Constraints'
+            #
+            # # Create an orientation constraint for the right gripper
+            # r_grip_const = dual_arm.get_current_pose('r_wrist_roll_link')
+            # r_grip_oc = OrientationConstraint()
+            # r_grip_oc.header = r_grip_const.header
+            # r_grip_oc.link_name = 'r_wrist_roll_link'
+            # r_grip_oc.orientation = p1.pose.orientation
+            # r_grip_oc.absolute_x_axis_tolerance = 10
+            # r_grip_oc.absolute_y_axis_tolerance = 10
+            # r_grip_oc.absolute_z_axis_tolerance = 10
+            # r_grip_oc.weight = 0.1
+            # constraints.orientation_constraints.append(r_grip_oc)
+            #
+            # # Create an orientation constraint for the left gripper
+            # l_grip_const = dual_arm.get_current_pose('l_wrist_roll_link')
+            # l_grip_oc = OrientationConstraint()
+            # l_grip_oc.header = l_grip_const.header
+            # l_grip_oc.link_name = 'l_wrist_roll_link'
+            # l_grip_oc.orientation = p2.pose.orientation
+            # l_grip_oc.absolute_x_axis_tolerance = 10
+            # l_grip_oc.absolute_y_axis_tolerance = 10
+            # l_grip_oc.absolute_z_axis_tolerance = 10
+            # l_grip_oc.weight = 0.1
+            # # Append the constraint to the list of contraints
+            # constraints.orientation_constraints.append(l_grip_oc)
+            # # dual_arm.set_path_constraints(constraints)
+            #
+            # r_grip_const.pose.position.z += 0.15
+            # dual_arm.set_pose_target(r_grip_const, 'r_wrist_roll_link')
+            #
+            # l_grip_const.pose.position.z += 0.15
+            # dual_arm.set_pose_target(l_grip_const, 'l_wrist_roll_link')
+            #
+            #
+            #
+            # dual_arm.plan()
+            # rospy.sleep(4)
+            # dual_arm.go(wait = True)
+            #
             # dual_arm.clear_pose_targets()
             # dual_arm.clear_path_constraints()
-            # rospy.loginfo(constraints)
-            # exit(1)
+            #
+            #
+            # # rospy.loginfo("2 =================================================")
+            # # #TODO: Need to update to current pose before approach object
+            # # dual_arm.set_pose_reference_frame(object_id)
+            # #
+            # # pt1 = dual_arm.get_current_pose('r_wrist_roll_link')
+            # # p1.pose = pt1.pose
+            # # p1.pose.position.x -= 0.002
+            # #
+            # # pt2 = dual_arm.get_current_pose('l_wrist_roll_link')
+            # # p2.pose = pt2.pose
+            # # p2.pose.position.x += 0.002
+            # #
+            # # r_goal = tf2_geometry_msgs.do_transform_pose(p1,trans)
+            # # l_goal = tf2_geometry_msgs.do_transform_pose(p2,trans)
+            # #
+            # # dual_arm.set_pose_target(r_goal, 'r_wrist_roll_link')
+            # # dual_arm.set_pose_target(l_goal, 'l_wrist_roll_link')
+            # # dual_arm.set_start_state_to_current_state()
+            # # dual_arm.plan()
+            # # rospy.sleep(3)
+            # # dual_arm.go(wait=True)
+            # # rospy.sleep(2)
+            #
+            #
+            #
+            # ## Rotate object
+            #
+            # r_rpy = dual_arm.get_current_rpy('r_wrist_roll_link')
+            # r_quat = tf.transformations.quaternion_from_euler(-1, r_rpy[1], r_rpy[2])
+            # rospy.loginfo(r_quat)
+            # r_grip_const.pose.orientation = Quaternion(r_quat[0],r_quat[1],
+            #                                            r_quat[2],r_quat[3])
+            # dual_arm.set_pose_target(r_grip_const, 'r_wrist_roll_link')
+            #
+            #
+            # l_rpy = dual_arm.get_current_rpy('l_wrist_roll_link')
+            # l_quat = tf.transformations.quaternion_from_euler(1, l_rpy[1], l_rpy[2])
+            # l_grip_const.pose.orientation = Quaternion(l_quat[0],l_quat[1],
+            #                                            l_quat[2],l_quat[3])
+            # dual_arm.set_pose_target(l_grip_const, 'l_wrist_roll_link')
+            #
+            #
+            # dual_arm.plan()
+            # rospy.sleep(4)
+            # dual_arm.go(wait = True)
+            # rospy.sleep(4)
+            #
+            #
+            #
+            # dual_arm.set_pose_reference_frame(object_id)
+            #
+            #
+            #
+            # dual_arm.shift_pose_target(0, 0.05,'r_wrist_roll_link')
+            # dual_arm.shift_pose_target(0, 0.05,'l_wrist_roll_link')
+            # dual_arm.plan()
+            # rospy.sleep(1)
+            # dual_arm.go(wait = True)
+            # rospy.sleep(1)
+            #
+            # dual_arm.shift_pose_target(1, 0.05,'r_wrist_roll_link')
+            # dual_arm.shift_pose_target(1, 0.05,'l_wrist_roll_link')
+            # dual_arm.plan()
+            # rospy.sleep(1)
+            # dual_arm.go(wait = True)
+            # rospy.sleep(1)
+            #
+            #
+            # dual_arm.shift_pose_target(0, -0.05,'r_wrist_roll_link')
+            # dual_arm.shift_pose_target(0, -0.05,'l_wrist_roll_link')
+            # dual_arm.plan()
+            # rospy.sleep(1)
+            # dual_arm.go(wait = True)
+            # rospy.sleep(1)
+            #
+            # dual_arm.shift_pose_target(1, -0.05,'r_wrist_roll_link')
+            # dual_arm.shift_pose_target(1, -0.05,'l_wrist_roll_link')
+            # dual_arm.plan()
+            # rospy.sleep(1)
+            # dual_arm.go(wait = True)
+            # rospy.sleep(1)
+            #
+            # #TODO: Do circles with the object
+            #
+            #
+            #
+            # # dual_arm.clear_pose_targets()
+            # # dual_arm.clear_path_constraints()
+            # # rospy.loginfo(constraints)
+            # # exit(1)
 
 
         except (tf2_ros.LookupException, tf2_ros.ConnectivityException,
