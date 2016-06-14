@@ -135,24 +135,38 @@ def add_scene_object(name = 'ros_hydro', obj_type = 'box',
 
 
 def get_manip_pose(obj, pub, dim, grip_len = 0.21, origin_offset = (0,0.05,0),
-                  ax = 4):
+                  direction = 'X', marker_size = [.2,.01,.01]):
     marker_array = MarkerArray()
     poses = PoseArray()
     poses.header.frame_id = obj
     poses.header.stamp = rospy.Time(0)
 
-    # grip_len = 0.21
     col = (0.3, 0.1, 0.0)
+
+    if direction == 'X':
+        ax = 0
+    elif direction == 'Y':
+        ax = 2
+    elif direction == 'Z':
+        ax = 8
+    elif direction == 'TR-BL':
+        ax = 4
+    elif direction == 'BR-TL':
+        ax = 6
+    elif direction == 'TL-BR':
+        ax = 10
+    elif direction == 'BL-TR':
+        ax = 12
 
     # Pointing towards the origin
     Right_Orient = (-1.,0.,0.)
     Left_Orient = (1.,0.,0.)
     Top_Orient = (0.,-1.,0.)
     Bottom_Orient = (0.,1.,0.)
-    Top_Right_Orient = (-1.,-1.,0.)
-    Bottom_Left_Orient =(1.,1.,0.)
-    Top_Left_Orient = (1.,-1.,0.)
-    Bottom_Right_Orient =(-1.,1.,0.)
+    Top_Right_Orient = (-1.,-1.,-1.)
+    Bottom_Left_Orient =(1.,1.,1.)
+    Top_Left_Orient = (1.,-1.,-1.)
+    Bottom_Right_Orient =(-1.,1.,1.)
     Z_C_P_Orient = (0.,0.,-1.)
     Z_C_N_Orient = (0.,0.,1.)
 
@@ -204,19 +218,19 @@ def get_manip_pose(obj, pub, dim, grip_len = 0.21, origin_offset = (0,0.05,0),
             pose_target = pose_from_vector3D((C_B_Pos + Bottom_Orient))
             rospy.loginfo("Left-Y")
         elif i == 5:
-            pos = tuple([sum(x) for x in zip(C_R_Pos , C_T_Pos)])
+            pos = tuple([sum(x) for x in zip(C_R_Pos , C_T_Pos, C_Z_F_Pos)])
             pose_target = pose_from_vector3D ((pos + Top_Right_Orient))
             rospy.loginfo("Top-Right-Diag")
         elif i == 6:
-            pos = tuple( [sum(x) for x in zip(C_L_Pos + C_B_Pos)] )
+            pos = tuple( [sum(x) for x in zip(C_L_Pos , C_B_Pos, C_Z_B_Pos)] )
             pose_target = pose_from_vector3D ((pos + Bottom_Left_Orient))
             rospy.loginfo("Bottom-Left-Diag")
         elif i == 7:
-            pos = tuple( [sum(x) for x in zip(C_L_Pos + C_T_Pos)] )
+            pos = tuple( [sum(x) for x in zip(C_L_Pos , C_T_Pos, C_Z_F_Pos)] )
             pose_target = pose_from_vector3D ((pos + Top_Left_Orient))
             rospy.loginfo("Top-Left-Diag")
         elif i == 8:
-            pos = tuple( [sum(x) for x in zip(C_R_Pos + C_B_Pos)] )
+            pos = tuple( [sum(x) for x in zip(C_R_Pos , C_B_Pos, C_Z_B_Pos)] )
             pose_target = pose_from_vector3D ((pos + Bottom_Right_Orient))
             rospy.loginfo("Bottom-Right-Diag")
         elif i == 9:
@@ -233,7 +247,7 @@ def get_manip_pose(obj, pub, dim, grip_len = 0.21, origin_offset = (0,0.05,0),
 
         poses.poses.append(pose_target)
 
-        marker_array.markers.append(create_marker(Marker.ARROW, [.2,.01,.01],
+        marker_array.markers.append(create_marker(Marker.ARROW, marker_size,
                                        frame = obj, ns = obj, id = i,
                                        p = pose_target,
                                        color = col, opaque = 1))
@@ -292,6 +306,8 @@ def pick_n_place():
     point_cloud_offset_z = 0.05
     approach_dist = 0.022
 
+    grip_width = 0.04
+
 
     raw_input("Press Enter to continue if Rviz visable...")
 
@@ -307,38 +323,47 @@ def pick_n_place():
             trans = tfBuffer.lookup_transform('odom_combined', object_id,
                                               rospy.Time(0))
 
-            rospy.loginfo('IN HERE')
-            # r_gripper.openGripper()
-            # l_gripper.openGripper()
+            if r_gripper.getGripperPos() < grip_width:
+                r_gripper.openGripper()
+                rospy.sleep(2)
 
-            pose_array = get_manip_pose(object_id, markerArray_pub, object_dim)
-            rospy.sleep(1)
+            if l_gripper.getGripperPos() < grip_width:
+                l_gripper.openGripper()
+                rospy.sleep(2)
 
-            # p1 = PoseStamped()
-            # p1.header = pose_array.header
-            #
-            # p1.pose = pose_array.poses[0]
-            # p1.pose.position.z -= point_cloud_offset_z
-            # p1.pose.position.x -= 0.03
-            # r_goal = tf2_geometry_msgs.do_transform_pose(p1,trans)
-            #
-            #
-            # p2 = PoseStamped()
-            # p2.header = pose_array.header
-            #
-            # p2.pose = pose_array.poses[1]
-            # p2.pose.position.z -= point_cloud_offset_z
+            # l_gripper.gripperToPos(0.05)
+
+            pose_array = get_manip_pose(object_id, markerArray_pub, object_dim,
+                                       direction = 'X')
+
+            p1 = PoseStamped()
+            p1.header = pose_array.header
+
+            p1.pose = pose_array.poses[0]
+            p1.pose.position.z -= point_cloud_offset_z
+            p1.pose.position.x -= 0.03
+            p1.pose.position.y -= 0.03
+            r_goal = tf2_geometry_msgs.do_transform_pose(p1,trans)
+
+
+            p2 = PoseStamped()
+            p2.header = pose_array.header
+
+            p2.pose = pose_array.poses[1]
+            p2.pose.position.z -= point_cloud_offset_z
             # p2.pose.position.x += 0.01
-            # l_goal = tf2_geometry_msgs.do_transform_pose(p2,trans)
-            #
-            # dual_arm.set_goal_tolerance(0.01)
-            # dual_arm.set_pose_target(r_goal, 'r_wrist_roll_link')
-            # dual_arm.set_pose_target(l_goal, 'l_wrist_roll_link')
-            # dual_arm.set_start_state_to_current_state()
-            # dual_arm.plan()
-            # rospy.sleep(3)
-            # dual_arm.go(wait=True)
-            # rospy.sleep(2)
+            p2.pose.position.y -= 0.04
+            l_goal = tf2_geometry_msgs.do_transform_pose(p2,trans)
+
+            dual_arm.set_goal_tolerance(0.01)
+            dual_arm.set_pose_target(r_goal, 'r_wrist_roll_link')
+            dual_arm.set_pose_target(l_goal, 'l_wrist_roll_link')
+            dual_arm.set_start_state_to_current_state()
+            dual_arm.plan()
+            rospy.sleep(3)
+            dual_arm.go(wait=True)
+            rospy.sleep(2)
+            # exit(0)
             #
             #
             # #approach object
