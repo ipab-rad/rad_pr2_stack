@@ -40,7 +40,12 @@
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/visualization/cloud_viewer.h>
 #include <pcl/io/pcd_io.h>
+#include <pcl/io/io.h>
 #include <vtkRenderWindow.h>
+
+#include <pcl/kdtree/kdtree_flann.h>
+#include <pcl/features/normal_3d.h>
+#include <pcl/surface/gp3.h>
 
 #include <Eigen/Dense>
 
@@ -105,10 +110,13 @@ pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_p(
     new pcl::PointCloud<pcl::PointXYZRGB>),
         cloud(new pcl::PointCloud<pcl::PointXYZRGB>),
         outliers_p(new pcl::PointCloud<pcl::PointXYZRGB>);
+pcl::PolygonMesh mesh;
 
 // PCL Viewer
 boost::shared_ptr<pcl::visualization::PCLVisualizer> pclViewer(
     new pcl::visualization::PCLVisualizer("Plane segmentation"));
+boost::shared_ptr<pcl::visualization::PCLVisualizer> meshViewer(
+    new pcl::visualization::PCLVisualizer("3D mesh viewer"));
 
 void updatePCLViewer() {
     pclViewer->removeAllPointClouds();
@@ -174,25 +182,79 @@ void new_cloud_callback(const pcl::PCLPointCloud2::ConstPtr& msg) {
     pc_msg = msg;
 }
 
+void generate_mesh(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) {
+    ros::Time s_ros = ros::Time::now();
+
+    // Normal estimation*
+    pcl::NormalEstimation<pcl::PointXYZ, pcl::Normal> n;
+    pcl::PointCloud<pcl::Normal>::Ptr normals(
+        new pcl::PointCloud<pcl::Normal>);
+    pcl::search::KdTree<pcl::PointXYZ>::Ptr tree(
+        new pcl::search::KdTree<pcl::PointXYZ>);
+    tree->setInputCloud(cloud);
+    n.setInputCloud(cloud);
+    n.setSearchMethod(tree);
+    n.setKSearch(20);
+    n.compute(*normals);
+    //* normals should not contain the point normals + surface curvatures
+
+    // Concatenate the XYZ and normal fields*
+    pcl::PointCloud<pcl::PointNormal>::Ptr cloud_with_normals(
+        new pcl::PointCloud<pcl::PointNormal>);
+    pcl::concatenateFields(*cloud, *normals, *cloud_with_normals);
+    //* cloud_with_normals = cloud + normals
+
+    // Create search tree*
+    pcl::search::KdTree<pcl::PointNormal>::Ptr tree2(
+        new pcl::search::KdTree<pcl::PointNormal>);
+    tree2->setInputCloud(cloud_with_normals);
+
+    // Initialize objects
+    pcl::GreedyProjectionTriangulation<pcl::PointNormal> gp3;
+
+
+    // Set the maximum distance between connected points(maximum edge length)
+    gp3.setSearchRadius(0.025);
+
+    // Set typical values for the parameters
+    gp3.setMu(2.5);
+    gp3.setMaximumNearestNeighbors(400);
+    gp3.setMaximumSurfaceAngle(M_PI / 4); //  /4 = 45 degrees
+    gp3.setMinimumAngle(M_PI / 18); // 10 degrees
+    gp3.setMaximumAngle(2 * M_PI / 3); // 120 degrees
+    gp3.setNormalConsistency(false);
+
+    // Get result
+    gp3.setInputCloud(cloud_with_normals);
+    gp3.setSearchMethod(tree2);
+    gp3.reconstruct(mesh);
+    ros::Time e_ros = ros::Time::now();
+    ROS_INFO(">> CPU Time mesh generation: %.2fms.",
+             (e_ros - s_ros).toNSec() * 1e-6);
+}
+
 void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
     ROS_INFO_STREAM("---");
     ros::Time s_ros, e_ros, total_time;
+
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered2(
+        new pcl::PointCloud<pcl::PointXYZRGB>);
     total_time = ros::Time::now();
-    // Convert the sensor_msgs/PointCloud2 data to pcl/PointCloud
-    pcl::fromPCLPointCloud2(*msg, *cloud);
+    if (leaf_size_m != 0) {
+        // Create the filtering object: downsample the dataset using a leaf size of 0.5cm
+        pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
+        sor.setInputCloud(msg);
+        sor.setLeafSize(leaf_size_m, leaf_size_m, leaf_size_m); //meters 0.005
+        pcl::PCLPointCloud2 cloud_filtered;
+        sor.filter(cloud_filtered);
 
-    // Create the filtering object: downsample the dataset using a leaf size of 0.5cm
-    pcl::VoxelGrid<pcl::PCLPointCloud2> sor;
-    sor.setInputCloud(msg);
-    sor.setLeafSize(leaf_size_m, leaf_size_m, leaf_size_m); //meters 0.005
-    pcl::PCLPointCloud2 cloud_filtered;
-    sor.filter(cloud_filtered);
-
-    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_filtered2(new
-                                                           pcl::PointCloud<pcl::PointXYZRGB>);
-    pcl::fromPCLPointCloud2(cloud_filtered, *cloud_filtered2);
+        pcl::fromPCLPointCloud2(cloud_filtered, *cloud_filtered2);
+    } else {
+        // Convert the sensor_msgs/PointCloud2 data to pcl/PointCloud
+        pcl::fromPCLPointCloud2(*msg, *cloud_filtered2);
+    }
     e_ros = ros::Time::now();
-    ROS_INFO(">> CPU Time VoxelGrid: %.2fms.",
+    ROS_INFO(">> CPU Time VoxelGrid or msg convertion: %.2fms.",
              (e_ros - total_time).toNSec() * 1e-6);
 
     // Filter all
@@ -218,7 +280,7 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
 
         // Extract
         // Create the segmentation object
-        pcl::ModelCoefficients::Ptr coefficients (new pcl::ModelCoefficients());
+        pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients());
         pcl::PointIndices::Ptr outliers(new pcl::PointIndices());
         pcl::SACSegmentation<pcl::PointXYZRGB> sacs_segm;
         sacs_segm.setOptimizeCoefficients(true);
@@ -300,7 +362,7 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
 
                 prism.setInputCloud(cloud_filtered2);
                 prism.setInputPlanarHull(convexHull);
-                // First parameter: minimum Z value. Set to 0, segments objects lying on the plane (can be negative).
+                // First parameter: minimum Z value. Set to 0, segments objects lying on the plane(can be negative).
                 // Second parameter: maximum Z value, set to 1.50m. Tune it according to the height of the objects you expect.
                 prism.setHeightLimits(plane_threshold_m * thr_scale,
                                       simple_threshold_z_plane_height_max);
@@ -343,7 +405,7 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
 
         if (colour_filtering && objects->size() > 0) {
             s_ros = ros::Time::now();
-            pcl::PointIndices::Ptr idxs (new pcl::PointIndices ());
+            pcl::PointIndices::Ptr idxs(new pcl::PointIndices());
             // iota(idxs->indices.begin(), idxs->indices.end(), 0);
 
             for (int i = 0; i < objects->size(); ++i) {
@@ -392,8 +454,8 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
         if (euclidean_clustering && objects->size() > 0) {
             clock_t tStart = clock();
             // Creating the KdTree object for the search method of the extraction
-            pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree (new
-                                                             pcl::search::KdTree<pcl::PointXYZRGB>);
+            pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree(new
+                                                            pcl::search::KdTree<pcl::PointXYZRGB>);
             tree->setInputCloud(objects);
 
             std::vector<pcl::PointIndices> cluster_indices;
@@ -401,7 +463,7 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
             // TODO: Extract the numbers as dynamic param
             ec.setClusterTolerance(0.02); // 2cm
             ec.setMinClusterSize(100);
-            ec.setMaxClusterSize(25000);
+            ec.setMaxClusterSize(250000);
             ec.setSearchMethod(tree);
             ec.setInputCloud(objects);
             ec.extract(cluster_indices);
@@ -423,8 +485,8 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
                     }
                 }
 
-                pcl::PointCloud<pcl::PointXYZRGB>::Ptr cobj(new
-                                                            pcl::PointCloud<pcl::PointXYZRGB>);
+                pcl::PointCloud<pcl::PointXYZRGB>::Ptr cobj(
+                    new pcl::PointCloud<pcl::PointXYZRGB>);
                 pcl::PointIndices::Ptr idxs(new pcl::PointIndices(cluster_indices[min_idx]));
                 extract.setInputCloud(objects);
                 extract.setIndices(idxs);
@@ -435,6 +497,11 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
                 cluster_pub.publish(segm_obj);
                 ROS_INFO(">> CPU Time cluster selection and publishing: %.2fms",
                          (double)(clock() - tStart) / CLOCKS_PER_SEC * 1000);
+
+                pcl::PointCloud<pcl::PointXYZ>::Ptr xyz_cobj(
+                    new pcl::PointCloud<pcl::PointXYZ>);
+                pcl::copyPointCloud(*cobj, *xyz_cobj);
+                generate_mesh(xyz_cobj);
             }
         }
 
@@ -534,6 +601,7 @@ bool request_pointcloud_callback(
 int main(int argc, char** argv) {
     ros::init(argc, argv, "plane_segmentation");
     ros::NodeHandle nh("~");
+    ROS_INFO("HEREEEE");
 
     dynamic_reconfigure::Server<plane_segmentation::PlaneSegmentationParamsConfig>
     server;
@@ -544,7 +612,9 @@ int main(int argc, char** argv) {
 
     // Possible pointclouds: "/kinect2/hd/points" //xtion: "/camera/depth_registered/points"
     // Pro tip: Use qhd or hd topic, as the sd pointcloud has an offset in y direction.
-    pointcloud_sub = nh.subscribe("/kinect2/qhd/points", 1, new_cloud_callback);
+    //    pointcloud_sub = nh.subscribe("/kinect2/qhd/points", 1, new_cloud_callback);
+    pointcloud_sub = nh.subscribe("/camera/depth_registered/points", 1,
+                                  new_cloud_callback);
 
     // Create a ROS publisher for the output point cloud
     plane_pub = nh.advertise<sensor_msgs::PointCloud2>("extracted_planes", 1);
@@ -564,16 +634,30 @@ int main(int argc, char** argv) {
     renderWindow->SetSize(640, 480);
     renderWindow->Render();
 
+    ROS_WARN_STREAM("Starting the mesh_viwedrsad");
+    meshViewer->setBackgroundColor(0, 0, 0);
+    meshViewer->initCameraParameters();
+    // meshViewer->addCoordinateSystem(1.0);
+    meshViewer->setCameraPosition(0, 0, 0, 0, 0, 1, 0, -1, 0);
+    vtkSmartPointer<vtkRenderWindow> renderWindow_mesh =
+        meshViewer->getRenderWindow();
+    renderWindow_mesh->SetSize(640, 480);
+    renderWindow_mesh->Render();
+
+    ROS_WARN_STREAM("Starting spin");
     ros::Rate r(30);
-    while (ros::ok() && !pclViewer->wasStopped()) {
+    while (ros::ok() && !pclViewer->wasStopped() /*&& !meshViewer->wasStopped()*/) {
         ros::spinOnce();
         update_params(should_update_params);
         if (request_pointcloud && pc_msg != nullptr) {
             ROS_INFO_STREAM("Processing new pointcloud");
             new_cloud_2_process(pc_msg);
             request_pointcloud = false;
+            meshViewer->removePolygonMesh("meshes");
+            meshViewer->addPolygonMesh(mesh, "meshes", 0);
         }
         pclViewer->spinOnce(100);
+        meshViewer->spinOnce(100);
         r.sleep();
     }
     return 0;

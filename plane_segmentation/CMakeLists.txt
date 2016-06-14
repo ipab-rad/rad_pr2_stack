@@ -126,7 +126,7 @@ catkin_package(
 
 set(CMAKE_CXX_COMPILER "clang++-3.6")
 set(CMAKE_C_COMPILER "clang-3.6")
-set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wno-deprecated-register -O3 -Wno-overloaded-virtual" )
+set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wno-deprecated-register -O2 -Wno-overloaded-virtual" )
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
