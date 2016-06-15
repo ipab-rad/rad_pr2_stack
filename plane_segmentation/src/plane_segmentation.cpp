@@ -36,16 +36,24 @@
 #include <pcl/filters/radius_outlier_removal.h>
 #include <pcl/filters/conditional_removal.h>
 #include <pcl/filters/filter.h>
+#include <pcl/filters/project_inliers.h>
 
 #include <pcl/visualization/pcl_visualizer.h>
 #include <pcl/visualization/cloud_viewer.h>
 #include <pcl/io/pcd_io.h>
+#include <pcl/io/ply_io.h>
 #include <pcl/io/io.h>
 #include <vtkRenderWindow.h>
 
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl/features/normal_3d.h>
 #include <pcl/surface/gp3.h>
+
+#include <pcl/common/common.h>
+#include <pcl/io/pcd_io.h>
+#include <pcl/features/normal_3d_omp.h>
+#include <pcl/surface/mls.h>
+#include <pcl/surface/poisson.h>
 
 #include <Eigen/Dense>
 
@@ -80,6 +88,9 @@ bool publish_outliers;
 bool euclidean_clustering;
 int prefiltering;
 int postfiltering_segmented;
+bool mesh_save;
+bool mesh_view;
+int meshing_method;
 
 // New params
 bool should_update_params = true;
@@ -98,6 +109,9 @@ bool publish_outliers_new;
 bool euclidean_clustering_new;
 int prefiltering_new;
 int postfiltering_segmented_new;
+bool mesh_save_new;
+bool mesh_view_new;
+int meshing_method_new;
 
 // ROS vars
 bool request_pointcloud = false;
@@ -170,6 +184,9 @@ void update_params(bool& should_update) {
     euclidean_clustering = euclidean_clustering_new;
     prefiltering = prefiltering_new;
     postfiltering_segmented = postfiltering_segmented_new;
+    mesh_save = mesh_save_new;
+    mesh_view = mesh_view_new;
+    meshing_method = meshing_method_new;
 
     should_update = false;
     ROS_INFO_STREAM("Updated params correcty!");
@@ -180,6 +197,75 @@ pcl::PCLPointCloud2::ConstPtr pc_msg;
 void new_cloud_callback(const pcl::PCLPointCloud2::ConstPtr& msg) {
     ROS_INFO_STREAM("Got a new PointCloud!!!");
     pc_msg = msg;
+}
+
+void remove_nans(pcl::PointCloud<pcl::PointXYZ>::Ptr& cloud) {
+    pcl::PointCloud<pcl::PointXYZ>::Ptr fc(
+        new pcl::PointCloud<pcl::PointXYZ>());
+    for (size_t i = 0; i < cloud->size(); ++i) {
+        if (pcl_isfinite(cloud->points[i].x) &&
+                pcl_isfinite(cloud->points[i].y) &&
+                pcl_isfinite(cloud->points[i].z)) {
+            // Add point
+            fc->push_back(cloud->points[i]);
+        }
+    }
+    cloud = fc;
+}
+
+
+void refine_mesh(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) {
+    ros::Time s_ros = ros::Time::now();
+    pcl::MovingLeastSquares<pcl::PointXYZ, pcl::PointXYZ> mls;
+    mls.setInputCloud(cloud);
+    mls.setSearchRadius(0.01);
+    mls.setPolynomialFit(true);
+    mls.setPolynomialOrder(2);
+    mls.setUpsamplingMethod(
+        pcl::MovingLeastSquares<pcl::PointXYZ, pcl::PointXYZ>::SAMPLE_LOCAL_PLANE);
+    mls.setUpsamplingRadius(0.005);
+    mls.setUpsamplingStepSize(0.003);
+    pcl::PointCloud<pcl::PointXYZ>::Ptr cloud_smoothed(
+        new pcl::PointCloud<pcl::PointXYZ>());
+    mls.process(*cloud_smoothed);
+    remove_nans(cloud_smoothed);
+    for (int i = 0; i < cloud_smoothed->size(); ++i) {
+        if (!pcl_isfinite(cloud_smoothed->points[i].x))
+            std::cout << cloud_smoothed->points[i] << std::endl;
+    }
+
+    ROS_INFO_STREAM("Cloud smoothed: " << cloud_smoothed->size());
+
+    pcl::NormalEstimationOMP<pcl::PointXYZ, pcl::Normal> ne;
+    ne.setNumberOfThreads(8);
+    ne.setInputCloud(cloud_smoothed);
+    ne.setRadiusSearch(0.005);
+    Eigen::Vector4f centroid;
+    pcl::compute3DCentroid(*cloud_smoothed, centroid);
+    ROS_INFO_STREAM("centroid:: " << centroid);
+    ne.setViewPoint(centroid[0], centroid[1], centroid[2]);
+    pcl::PointCloud<pcl::Normal>::Ptr cloud_normals(
+        new pcl::PointCloud<pcl::Normal>());
+    ne.compute(*cloud_normals);
+
+    for (size_t i = 0; i < cloud_normals->size(); ++i) {
+        cloud_normals->points[i].normal_x *= -1;
+        cloud_normals->points[i].normal_y *= -1;
+        cloud_normals->points[i].normal_z *= -1;
+    }
+    pcl::PointCloud<pcl::PointNormal>::Ptr cloud_smoothed_normals(
+        new pcl::PointCloud<pcl::PointNormal>());
+    pcl::concatenateFields(*cloud_smoothed, *cloud_normals,
+                           *cloud_smoothed_normals);
+    pcl::Poisson<pcl::PointNormal> poisson;
+    poisson.setDepth(9);
+    poisson.setInputCloud(cloud_smoothed_normals);
+    // PolygonMesh mesh;
+    poisson.reconstruct(mesh);
+
+    ros::Time e_ros = ros::Time::now();
+    ROS_INFO(">> CPU Time mesh refinement: %.2fms.",
+             (e_ros - s_ros).toNSec() * 1e-6);
 }
 
 void generate_mesh(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) {
@@ -195,6 +281,12 @@ void generate_mesh(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) {
     n.setInputCloud(cloud);
     n.setSearchMethod(tree);
     n.setKSearch(20);
+
+    //
+    Eigen::Vector4f centroid;
+    pcl::compute3DCentroid(*cloud, centroid);
+    n.setViewPoint(centroid[0], centroid[1], centroid[2]);
+    //
     n.compute(*normals);
     //* normals should not contain the point normals + surface curvatures
 
@@ -211,8 +303,6 @@ void generate_mesh(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) {
 
     // Initialize objects
     pcl::GreedyProjectionTriangulation<pcl::PointNormal> gp3;
-
-
     // Set the maximum distance between connected points(maximum edge length)
     gp3.setSearchRadius(0.025);
 
@@ -231,6 +321,19 @@ void generate_mesh(pcl::PointCloud<pcl::PointXYZ>::Ptr cloud) {
     ros::Time e_ros = ros::Time::now();
     ROS_INFO(">> CPU Time mesh generation: %.2fms.",
              (e_ros - s_ros).toNSec() * 1e-6);
+}
+
+void add_floor_2_mesh(pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud,
+                      pcl::ModelCoefficients::Ptr coefficients) {
+    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_projected(
+        new pcl::PointCloud<pcl::PointXYZRGB>);
+    pcl::ProjectInliers<pcl::PointXYZRGB> proj;
+    proj.setModelType(pcl::SACMODEL_PLANE);
+    proj.setInputCloud(cloud);
+    proj.setModelCoefficients(coefficients);
+    proj.filter(*cloud_projected);
+
+    *cloud += *cloud_projected;
 }
 
 void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
@@ -254,7 +357,7 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
         pcl::fromPCLPointCloud2(*msg, *cloud_filtered2);
     }
     e_ros = ros::Time::now();
-    ROS_INFO(">> CPU Time VoxelGrid or msg convertion: %.2fms.",
+    ROS_INFO(">> CPU Time VoxelGrid or msg cpy: %.2fms.",
              (e_ros - total_time).toNSec() * 1e-6);
 
     // Filter all
@@ -275,12 +378,12 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
 
     pcl::PointIndices::Ptr inliers(new pcl::PointIndices());
     pcl::ExtractIndices<pcl::PointXYZRGB> extract;
+    pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients());
     if (publish_planes || publish_outliers || segment_objects) {
         s_ros = ros::Time::now();
 
         // Extract
         // Create the segmentation object
-        pcl::ModelCoefficients::Ptr coefficients(new pcl::ModelCoefficients());
         pcl::PointIndices::Ptr outliers(new pcl::PointIndices());
         pcl::SACSegmentation<pcl::PointXYZRGB> sacs_segm;
         sacs_segm.setOptimizeCoefficients(true);
@@ -349,8 +452,8 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
 
             // Retrieve the convex hull.
             pcl::ConvexHull<pcl::PointXYZRGB> hull;
-            pcl::PointCloud<pcl::PointXYZRGB>::Ptr convexHull(new
-                                                              pcl::PointCloud<pcl::PointXYZRGB>);
+            pcl::PointCloud<pcl::PointXYZRGB>::Ptr convexHull(
+                new pcl::PointCloud<pcl::PointXYZRGB>);
             hull.setInputCloud(plane);
             // Make sure that the resulting hull is bidimensional.
             hull.setDimension(2);
@@ -454,15 +557,15 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
         if (euclidean_clustering && objects->size() > 0) {
             clock_t tStart = clock();
             // Creating the KdTree object for the search method of the extraction
-            pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree(new
-                                                            pcl::search::KdTree<pcl::PointXYZRGB>);
+            pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree(
+                new pcl::search::KdTree<pcl::PointXYZRGB>);
             tree->setInputCloud(objects);
 
             std::vector<pcl::PointIndices> cluster_indices;
             pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> ec;
             // TODO: Extract the numbers as dynamic param
             ec.setClusterTolerance(0.02); // 2cm
-            ec.setMinClusterSize(100);
+            ec.setMinClusterSize(1000);
             ec.setMaxClusterSize(250000);
             ec.setSearchMethod(tree);
             ec.setInputCloud(objects);
@@ -492,6 +595,9 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
                 extract.setIndices(idxs);
                 extract.setNegative(false);
                 extract.filter(*cobj);
+
+                add_floor_2_mesh(cobj, coefficients);
+
                 sensor_msgs::PointCloud2 segm_obj;
                 pcl::toROSMsg(*cobj, segm_obj);
                 cluster_pub.publish(segm_obj);
@@ -501,7 +607,22 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
                 pcl::PointCloud<pcl::PointXYZ>::Ptr xyz_cobj(
                     new pcl::PointCloud<pcl::PointXYZ>);
                 pcl::copyPointCloud(*cobj, *xyz_cobj);
-                generate_mesh(xyz_cobj);
+
+                if (mesh_save) {
+                    // generate_mesh(xyz_cobj);
+                    bool binary_mode = false;
+                    pcl::io::savePLYFile ("/tmp/obj.ply", *cobj, binary_mode);
+                }
+                if (mesh_view) {
+                    if (meshing_method == 0)
+                        generate_mesh(xyz_cobj);
+                    else if (meshing_method == 1) {
+                        refine_mesh(xyz_cobj);
+                    } else {
+                        ROS_WARN_STREAM("Wrong meshing index.");
+                    }
+
+                }
             }
         }
 
@@ -569,6 +690,9 @@ void dynamic_recongifure_callback(
     euclidean_clustering_new = config.euclidean_clustering;
     prefiltering_new = config.prefiltering;
     postfiltering_segmented_new = config.postfiltering_segmented;
+    mesh_save_new = config.mesh_save;
+    mesh_view_new = config.mesh_view;
+    meshing_method_new = config.meshing_method;
 
     // Indicate new params need to be read
     should_update_params = true;
@@ -591,7 +715,7 @@ void dynamic_recongifure_callback(
 }
 
 bool request_pointcloud_callback(
-    std_srvs::Empty::Request&  req,
+    std_srvs::Empty::Request&   req,
     std_srvs::Empty::Response& res) {
     ROS_INFO_STREAM("Received a request for processing!");
     request_pointcloud = true;
@@ -653,11 +777,15 @@ int main(int argc, char** argv) {
             ROS_INFO_STREAM("Processing new pointcloud");
             new_cloud_2_process(pc_msg);
             request_pointcloud = false;
-            meshViewer->removePolygonMesh("meshes");
-            meshViewer->addPolygonMesh(mesh, "meshes", 0);
+
+            if (mesh_view) {
+                meshViewer->removePolygonMesh("meshes");
+                meshViewer->addPolygonMesh(mesh, "meshes", 0);
+            }
         }
         pclViewer->spinOnce(100);
-        meshViewer->spinOnce(100);
+        if (mesh_view)
+            meshViewer->spinOnce(100);
         r.sleep();
     }
     return 0;
