@@ -259,9 +259,9 @@ void PickPlaceAction::AddCollisionObjs() {
   // A pose for the box (specified relative to frame_id)
   geometry_msgs::Pose table_top_pose;
   table_top_pose.orientation.w = 1.0;
-  table_top_pose.position.x =  1.0;
+  table_top_pose.position.x =  0.8;
   table_top_pose.position.y =  0.0;
-  table_top_pose.position.z =  0.72;
+  table_top_pose.position.z =  0.71;
 
   collision_object.primitives.push_back(primitive);
   collision_object.primitive_poses.push_back(table_top_pose);

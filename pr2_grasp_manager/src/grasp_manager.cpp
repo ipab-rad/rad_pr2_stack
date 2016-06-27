@@ -8,6 +8,7 @@
 
 #include <pr2_grasp_manager/grasp_manager.hpp>
 #include <pr2_picknplace_msgs/PicknPlaceGoal.h>
+#include <pr2_picknplace_msgs/GetSlope.h>
 
 #include <cmath>
 
@@ -38,6 +39,7 @@ GraspManager::~GraspManager() {
 
 void GraspManager::loadParams() {
   ros::param::param(ns_ + "/max_ac_execution_time", max_ac_execution_time, 30.0);
+  ros::param::param(ns_ + "/slope_max", slope_max, -10700.0);
 }
 
 void GraspManager::init() {
@@ -70,7 +72,7 @@ void GraspManager::init() {
   grasp_req_.gripper_opening_width = 1;
 
   place_pose_.position.x = 0.7;
-  place_pose_.position.y = -0.5;
+  place_pose_.position.y = -0.45;
   place_pose_.position.z = 0.8;
   place_pose_.orientation.x = 0;
   place_pose_.orientation.y = 0;
@@ -78,12 +80,19 @@ void GraspManager::init() {
   place_pose_.orientation.w = 1;
 
   moveto_pose_.position.x = 0.6;
-  moveto_pose_.position.y = -0.35;
-  moveto_pose_.position.z = 0.8;
+  moveto_pose_.position.y = -0.32;
+  moveto_pose_.position.z = 0.9;
   moveto_pose_.orientation.x = 0;
   moveto_pose_.orientation.y = 0;
   moveto_pose_.orientation.z = 0;
   moveto_pose_.orientation.w = 1;
+
+  // Different softness places
+  place_pose_soft = place_pose_; place_pose_soft.position.x += 0.0;
+  place_pose_semi_soft = place_pose_;
+  place_pose_hard = place_pose_; place_pose_hard.position.x -= 0.1;
+
+
 }
 
 void GraspManager::rosSetup() {
@@ -92,6 +101,10 @@ void GraspManager::rosSetup() {
                                    10, &GraspManager::pcCB, this);
   request_pc_ = nh_.serviceClient<std_srvs::Empty>
                 ("/plane_segmentator/request_pointcloud", true);
+  new_grasp_start_client = nh_.serviceClient<std_srvs::Empty>
+                           ("/stiffness_estimator/new_grasp_start", true);
+  get_slope_client = nh_.serviceClient<pr2_picknplace_msgs::GetSlope>
+                     ("/stiffness_estimator/get_slope", true);
 }
 
 void GraspManager::pcCB(const sensor_msgs::PointCloud2ConstPtr& msg) {
@@ -144,6 +157,8 @@ bool GraspManager::sendPick() {
   if (!ready_to_pick_) {
     ROS_INFO_THROTTLE(1, "Waiting for valid grasp pose...");
   } else {
+    ROS_INFO("Clearing old grasping data.");
+    new_grasp_start_client.call(empty_);
     ROS_INFO("Picking!");
     ready_to_pick_ = false;
     pr2_picknplace_msgs::PickPlaceGoal pick;
@@ -156,7 +171,7 @@ bool GraspManager::sendPick() {
     pick.goal.object_pose.position.x -= 0.031;
     // pick.goal.object_pose.position.y -= 0.02;
     pick.goal.object_pose.position.z =
-      std::max(0.68, pick.goal.object_pose.position.z - 0.055);
+      std::max(0.680, pick.goal.object_pose.position.z - 0.055);
 
     tf2::Quaternion q;    // TODO: WHY DOES IT ONLY WORK LIKE THIS?
     q.setRPY(0, 0, (grasp_res_.roll / M_PI) * 180);
@@ -168,6 +183,7 @@ bool GraspManager::sendPick() {
     //           " Y:" << q.y() <<
     //           " Z:" << q.z() <<
     //           " W:" << q.w();
+
     std::cout << pick.goal;
     pickplace_ac_.sendGoal(pick);
     bool finished_before_timeout = pickplace_ac_.waitForResult(
@@ -179,12 +195,18 @@ bool GraspManager::sendPick() {
       ROS_WARN("Couldn't sendPick in timeframe of %fs!", max_ac_execution_time);
     }
     ROS_INFO_STREAM("Pick status: " << ((success) ? "success" : "fail"));
+    if (success) {
+      pr2_picknplace_msgs::GetSlope slope_msg;
+      get_slope_client.call(slope_msg);
+      last_slope = slope_msg.response.slope;
+      ROS_WARN_STREAM("Raw slope: " << last_slope);
+    }
     ready_to_place_ = true;
   }
   return success;
 }
 
-bool GraspManager::sendPlace() {
+bool GraspManager::sendPlace(PLACE_LOCATION loc) {
   bool success = false;
   if (!ready_to_place_) {
     ROS_INFO_THROTTLE(1, "Waiting for object to be picked...");
@@ -195,7 +217,22 @@ bool GraspManager::sendPlace() {
     place.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::PLACE_REQUEST;
     place.goal.header.frame_id = "base_link";
     place.goal.header.stamp = ros::Time::now();
-    place.goal.object_pose = place_pose_;
+    switch (loc) {
+      case PLACE_LOCATION::SOFT:
+        ROS_WARN("Placing in a SOFT location");
+        place.goal.object_pose = place_pose_soft;
+        break;
+      case PLACE_LOCATION::SEMI_SOFT:
+        place.goal.object_pose = place_pose_semi_soft;
+        break;
+      case PLACE_LOCATION::HARD:
+        ROS_WARN("Placing in a HARD location");
+        place.goal.object_pose = place_pose_hard;
+        break;
+      default:
+        ROS_WARN("Wrong location selected!");
+        place.goal.object_pose = place_pose_;
+    }
     std::cout << place.goal;
     pickplace_ac_.sendGoal(place);
     bool finished_before_timeout = pickplace_ac_.waitForResult(
@@ -222,4 +259,8 @@ bool GraspManager::sendMoveTo() {
   request_pc_.call(empty_);
   ready_to_grasp_ = true;
   return success;
+}
+
+double GraspManager::isSoft() {
+  return double(last_slope) / slope_max;
 }

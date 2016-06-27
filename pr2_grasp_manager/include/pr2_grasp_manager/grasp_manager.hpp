@@ -33,6 +33,12 @@
 #include <pr2_picknplace_msgs/PickPlaceAction.h>
 #include <pr2_picknplace_msgs/PicknPlaceGoal.h>
 
+enum PLACE_LOCATION {
+	SOFT = 0,
+	SEMI_SOFT = 1,
+	HARD = 2
+};
+
 class GraspManager {
   protected:
 	void loadParams();
@@ -47,8 +53,9 @@ class GraspManager {
 
 	bool getGrasp();
 	bool sendPick();
-	bool sendPlace();
+	bool sendPlace(PLACE_LOCATION loc = PLACE_LOCATION::HARD);
 	bool sendMoveTo();
+	double isSoft();
 
   private:
 	// Methods
@@ -62,6 +69,7 @@ class GraspManager {
 
 	// Parameters
 	double max_ac_execution_time;
+	double slope_max;
 
 	// Variables
 	std::string ns_;
@@ -69,9 +77,13 @@ class GraspManager {
 	haf_grasping::GraspOutput grasp_res_;
 	haf_grasping::CalcGraspPointsServerActionGoal goal_;
 	geometry_msgs::Pose place_pose_;
+	geometry_msgs::Pose place_pose_soft;
+	geometry_msgs::Pose place_pose_semi_soft;
+	geometry_msgs::Pose place_pose_hard;
 	geometry_msgs::Pose moveto_pose_;
 
 	int eval_thresh;
+	double last_slope;
 
 	// ROS
 	actionlib::SimpleActionClient <haf_grasping::CalcGraspPointsServerAction>
@@ -80,6 +92,8 @@ class GraspManager {
 	pickplace_ac_;
 	ros::Subscriber point_cloud_sub_;
 	ros::ServiceClient request_pc_;
+	ros::ServiceClient new_grasp_start_client;
+	ros::ServiceClient get_slope_client;
 	std_srvs::Empty empty_;
 
 	tf2_ros::Buffer tfBuffer;

@@ -137,12 +137,21 @@ include_directories(
 add_executable(pr2_grasp_manager
   src/pr2_grasp_manager.cpp
   src/grasp_manager.cpp)
+add_executable(pr2_softness_sorter
+  src/pr2_softness_sorter.cpp
+  src/grasp_manager.cpp)
 
 add_dependencies(pr2_grasp_manager
   haf_grasping_gencpp
   pr2_picknplace_msgs_gencpp)
+add_dependencies(pr2_softness_sorter
+  haf_grasping_gencpp
+  pr2_picknplace_msgs_gencpp)
 
 target_link_libraries(pr2_grasp_manager
+  ${catkin_LIBRARIES}
+)
+target_link_libraries(pr2_softness_sorter
   ${catkin_LIBRARIES}
 )
 
