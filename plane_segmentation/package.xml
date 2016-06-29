@@ -16,6 +16,11 @@
   <build_depend>roscpp</build_depend>
   <build_depend>rospy</build_depend>
   <build_depend>dynamic_reconfigure</build_depend>
+  <build_depend>tf2_ros</build_depend>
+  <build_depend>tf2_eigen</build_depend>
+  <build_depend>tf2_sensor_msgs</build_depend>
+  <build_depend>pr2_picknplace_msgs</build_depend>
+
   <run_depend>pcl_conversions</run_depend>
   <run_depend>pcl_msgs</run_depend>
   <run_depend>std_svrs</run_depend>
@@ -23,5 +28,9 @@
   <run_depend>roscpp</run_depend>
   <run_depend>rospy</run_depend>
   <run_depend>dynamic_reconfigure</run_depend>
+  <run_depend>tf2_ros</run_depend>
+  <run_depend>tf2_eigen</run_depend>
+  <run_depend>tf2_sensor_msgs</run_depend>
+  <run_depend>pr2_picknplace_msgs</run_depend>
 
 </package>

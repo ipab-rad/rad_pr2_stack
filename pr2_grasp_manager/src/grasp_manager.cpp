@@ -97,7 +97,7 @@ void GraspManager::init() {
 
 void GraspManager::rosSetup() {
   // point_cloud_sub_ = nh_.subscribe("/plane_segmentator/extracted_outliers",
-  point_cloud_sub_ = nh_.subscribe("/plane_segmentator/segmented_objects_above",
+  point_cloud_sub_ = nh_.subscribe("/plane_segmentator/clustered_object",
                                    10, &GraspManager::pcCB, this);
   request_pc_ = nh_.serviceClient<std_srvs::Empty>
                 ("/plane_segmentator/request_pointcloud", true);
@@ -107,9 +107,11 @@ void GraspManager::rosSetup() {
                      ("/stiffness_estimator/get_slope", true);
 }
 
-void GraspManager::pcCB(const sensor_msgs::PointCloud2ConstPtr& msg) {
+void GraspManager::pcCB(
+  const pr2_picknplace_msgs::SegmentedObject::ConstPtr& msg) {
   ROS_INFO("Got PointCloud!");
-  grasp_req_.input_pc = *msg;
+  grasp_req_.input_pc = msg->cloud;
+  grasp_req_.grasp_area_center = msg->centroid;
   // goal_.header.stamp = msg->header.stamp;
   std_msgs::Header now;
   now.stamp = ros::Time::now();

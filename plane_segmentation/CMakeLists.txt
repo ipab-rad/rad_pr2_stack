@@ -12,6 +12,10 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   dynamic_reconfigure
+  tf2_ros
+  tf2_eigen
+  tf2_sensor_msgs
+  pr2_picknplace_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -164,6 +168,7 @@ add_dependencies(plane_segmentation_node
 #	${${PROJECT_NAME}_EXPORTED_TARGETS}
 #	${catkin_EXPORTED_TARGETS}
 	${PROJECT_NAME}_gencfg
+  pr2_picknplace_msgs_gencpp
 )
 
 ## Specify libraries to link a library or executable target against

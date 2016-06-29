@@ -23,6 +23,8 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <std_srvs/Empty.h>
 
+#include <pr2_picknplace_msgs/SegmentedObject.h>
+
 // Haf Grasping
 #include <haf_grasping/GraspInput.h>
 #include <haf_grasping/GraspOutput.h>
@@ -59,7 +61,7 @@ class GraspManager {
 
   private:
 	// Methods
-	void pcCB(const sensor_msgs::PointCloud2ConstPtr& msg);
+	void pcCB(const pr2_picknplace_msgs::SegmentedObject::ConstPtr& msg);
 
 	// Flags
 	bool pc_ready_;

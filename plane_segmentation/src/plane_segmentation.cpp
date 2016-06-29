@@ -6,10 +6,19 @@
 */
 
 #include <cstddef>
+#include <thread>
 
 #include <ros/ros.h>
+#include <tf2_eigen/tf2_eigen.h>
+#include <tf2_ros/transform_listener.h>
+#include <tf2_sensor_msgs/tf2_sensor_msgs.h>
+
+#include <pr2_picknplace_msgs/SegmentedObject.h>
+
 #include <sensor_msgs/PointCloud2.h>
+#include <geometry_msgs/TransformStamped.h>
 #include <std_srvs/Empty.h>
+
 #include <dynamic_reconfigure/server.h>
 #include <plane_segmentation/PlaneSegmentationParamsConfig.h>
 
@@ -91,6 +100,7 @@ int postfiltering_segmented;
 bool mesh_save;
 bool mesh_view;
 int meshing_method;
+double max_cluster_dist;
 
 // New params
 bool should_update_params = true;
@@ -112,8 +122,12 @@ int postfiltering_segmented_new;
 bool mesh_save_new;
 bool mesh_view_new;
 int meshing_method_new;
+double max_cluster_dist_new;
 
 // ROS vars
+std::string world_frame;
+tf2_ros::Buffer* tfBuffer;
+tf2_ros::TransformListener* tfListener;
 bool request_pointcloud = false;
 ros::Publisher plane_pub;
 ros::Publisher outlier_pub;
@@ -187,6 +201,7 @@ void update_params(bool& should_update) {
     mesh_save = mesh_save_new;
     mesh_view = mesh_view_new;
     meshing_method = meshing_method_new;
+    max_cluster_dist = max_cluster_dist_new;
 
     should_update = false;
     ROS_INFO_STREAM("Updated params correcty!");
@@ -556,6 +571,17 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
 
         if (euclidean_clustering && objects->size() > 0) {
             clock_t tStart = clock();
+            // Spawn a new thread to find tf!
+            geometry_msgs::TransformStamped transform;
+
+            // std::thread tf_thr([&transform, &msg]() ->void {
+            transform = tfBuffer->lookupTransform(world_frame,
+                                                  msg->header.frame_id,
+                                                  ros::Time(0), //acquisition_time - ros::Duration().fromSec(4),
+                                                  ros::Duration(0.2)
+                                                 );
+            // });
+
             // Creating the KdTree object for the search method of the extraction
             pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree(
                 new pcl::search::KdTree<pcl::PointXYZRGB>);
@@ -565,12 +591,16 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
             pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> ec;
             // TODO: Extract the numbers as dynamic param
             ec.setClusterTolerance(0.02); // 2cm
-            ec.setMinClusterSize(1000);
+            ec.setMinClusterSize(200);
             ec.setMaxClusterSize(250000);
             ec.setSearchMethod(tree);
             ec.setInputCloud(objects);
             ec.extract(cluster_indices);
             ROS_INFO_STREAM("Found " << cluster_indices.size() << " clusters.");
+
+            // Join tf thread
+            // tf_thr.join();
+
             ROS_INFO(">> CPU Time euclidean clustering: %.2fms",
                      (double)(clock() - tStart) / CLOCKS_PER_SEC * 1000);
 
@@ -588,40 +618,61 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
                     }
                 }
 
-                pcl::PointCloud<pcl::PointXYZRGB>::Ptr cobj(
-                    new pcl::PointCloud<pcl::PointXYZRGB>);
-                pcl::PointIndices::Ptr idxs(new pcl::PointIndices(cluster_indices[min_idx]));
-                extract.setInputCloud(objects);
-                extract.setIndices(idxs);
-                extract.setNegative(false);
-                extract.filter(*cobj);
+                ROS_INFO_STREAM("min_dist of cluster: " << min_dist);
+                if (min_dist <= max_cluster_dist) {
+                    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cobj(
+                        new pcl::PointCloud<pcl::PointXYZRGB>);
+                    pcl::PointCloud<pcl::PointXYZRGB>::Ptr cobj_world_frame(
+                        new pcl::PointCloud<pcl::PointXYZRGB>);
+                    pcl::PointIndices::Ptr idxs(new pcl::PointIndices(cluster_indices[min_idx]));
+                    extract.setInputCloud(objects);
+                    extract.setIndices(idxs);
+                    extract.setNegative(false);
+                    extract.filter(*cobj);
 
-                add_floor_2_mesh(cobj, coefficients);
+                    add_floor_2_mesh(cobj, coefficients);
 
-                sensor_msgs::PointCloud2 segm_obj;
-                pcl::toROSMsg(*cobj, segm_obj);
-                cluster_pub.publish(segm_obj);
-                ROS_INFO(">> CPU Time cluster selection and publishing: %.2fms",
-                         (double)(clock() - tStart) / CLOCKS_PER_SEC * 1000);
+                    // Transform
+                    Eigen::Affine3d eigen_transf = tf2::transformToEigen(transform);
+                    pcl::transformPointCloud(*cobj, *cobj_world_frame, eigen_transf);
 
-                pcl::PointCloud<pcl::PointXYZ>::Ptr xyz_cobj(
-                    new pcl::PointCloud<pcl::PointXYZ>);
-                pcl::copyPointCloud(*cobj, *xyz_cobj);
+                    Eigen::Vector4f centroid;
+                    pcl::compute3DCentroid(*cobj_world_frame, centroid);
+                    ROS_WARN_STREAM("Centroid: " << centroid);
 
-                if (mesh_save) {
-                    // generate_mesh(xyz_cobj);
-                    bool binary_mode = false;
-                    pcl::io::savePLYFile ("/tmp/obj.ply", *cobj, binary_mode);
-                }
-                if (mesh_view) {
-                    if (meshing_method == 0)
-                        generate_mesh(xyz_cobj);
-                    else if (meshing_method == 1) {
-                        refine_mesh(xyz_cobj);
-                    } else {
-                        ROS_WARN_STREAM("Wrong meshing index.");
+                    sensor_msgs::PointCloud2 segm_obj_world_frame;
+                    pcl::toROSMsg(*cobj_world_frame, segm_obj_world_frame);
+                    segm_obj_world_frame.header.frame_id = world_frame;
+                    segm_obj_world_frame.header.stamp = ros::Time::now();
+                    // Transform object to world_frame
+                    // tf2::doTransform(segm_obj, segm_obj_world_frame, transform);
+                    // ROS_INFO_STREAM("ALALALALLALA: " << segm_obj_world_frame.header.frame_id);
+
+                    pr2_picknplace_msgs::SegmentedObject segm_msg;
+                    segm_msg.cloud = segm_obj_world_frame;
+                    segm_msg.centroid.x = centroid.x();
+                    segm_msg.centroid.y = centroid.y();
+                    segm_msg.centroid.z = centroid.z();
+                    cluster_pub.publish(segm_msg);
+                    ROS_INFO(">> CPU Time cluster selection and publishing: %.2fms",
+                             (double)(clock() - tStart) / CLOCKS_PER_SEC * 1000);
+
+                    if (mesh_save) {
+                        bool binary_mode = false;
+                        pcl::io::savePLYFile ("/tmp/obj.ply", *cobj_world_frame, binary_mode);
                     }
-
+                    if (mesh_view) {
+                        pcl::PointCloud<pcl::PointXYZ>::Ptr xyz_cobj(
+                            new pcl::PointCloud<pcl::PointXYZ>);
+                        pcl::copyPointCloud(*cobj_world_frame, *xyz_cobj);
+                        if (meshing_method == 0)
+                            generate_mesh(xyz_cobj);
+                        else if (meshing_method == 1) {
+                            refine_mesh(xyz_cobj);
+                        } else {
+                            ROS_WARN_STREAM("Wrong meshing index.");
+                        }
+                    }
                 }
             }
         }
@@ -693,6 +744,7 @@ void dynamic_recongifure_callback(
     mesh_save_new = config.mesh_save;
     mesh_view_new = config.mesh_view;
     meshing_method_new = config.meshing_method;
+    max_cluster_dist_new = config.max_cluster_dist;
 
     // Indicate new params need to be read
     should_update_params = true;
@@ -711,7 +763,8 @@ void dynamic_recongifure_callback(
                      publish_outliers_new << " " <<
                      euclidean_clustering << " " <<
                      prefiltering_new << " " <<
-                     postfiltering_segmented_new);
+                     postfiltering_segmented_new << " " <<
+                     max_cluster_dist_new);
 }
 
 bool request_pointcloud_callback(
@@ -725,8 +778,9 @@ bool request_pointcloud_callback(
 int main(int argc, char** argv) {
     ros::init(argc, argv, "plane_segmentation");
     ros::NodeHandle nh("~");
-    ROS_INFO("HEREEEE");
 
+    tfBuffer = new tf2_ros::Buffer();
+    tfListener = new tf2_ros::TransformListener(*tfBuffer);
     dynamic_reconfigure::Server<plane_segmentation::PlaneSegmentationParamsConfig>
     server;
     dynamic_reconfigure::Server<plane_segmentation::PlaneSegmentationParamsConfig>::CallbackType
@@ -734,18 +788,20 @@ int main(int argc, char** argv) {
     f = boost::bind(&dynamic_recongifure_callback, _1, _2);
     server.setCallback(f);
 
+    ros::param::param<std::string>("world_frame", world_frame, "base_link");
+
     // Possible pointclouds: "/kinect2/hd/points" //xtion: "/camera/depth_registered/points"
     // Pro tip: Use qhd or hd topic, as the sd pointcloud has an offset in y direction.
-    //    pointcloud_sub = nh.subscribe("/kinect2/qhd/points", 1, new_cloud_callback);
-    pointcloud_sub = nh.subscribe("/camera/depth_registered/points", 1,
-                                  new_cloud_callback);
+    pointcloud_sub = nh.subscribe("/kinect2/qhd/points", 1, new_cloud_callback);
+    //pointcloud_sub = nh.subscribe("/camera/depth_registered/points", 1, new_cloud_callback);
 
     // Create a ROS publisher for the output point cloud
     plane_pub = nh.advertise<sensor_msgs::PointCloud2>("extracted_planes", 1);
     outlier_pub = nh.advertise<sensor_msgs::PointCloud2>("extracted_outliers", 1);
     segmented_pub =
         nh.advertise<sensor_msgs::PointCloud2>("segmented_objects_above", 1);
-    cluster_pub = nh.advertise<sensor_msgs::PointCloud2>("clustered_object", 1);
+    cluster_pub =
+        nh.advertise<pr2_picknplace_msgs::SegmentedObject>("clustered_object", 1);
     ros::ServiceServer request_pointcloud_service =
         nh.advertiseService("request_pointcloud",
                             request_pointcloud_callback);

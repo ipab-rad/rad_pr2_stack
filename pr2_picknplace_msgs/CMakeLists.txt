@@ -50,6 +50,7 @@ find_package(catkin REQUIRED COMPONENTS
 add_message_files(
   FILES
   PicknPlaceGoal.msg
+  SegmentedObject.msg
 )
 
 ## Generate services in the 'srv' folder
@@ -70,6 +71,7 @@ add_action_files(
  generate_messages(
    DEPENDENCIES
    std_msgs
+   sensor_msgs
    geometry_msgs
    actionlib_msgs
 )
