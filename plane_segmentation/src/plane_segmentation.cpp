@@ -37,6 +37,7 @@
 #include <pcl/segmentation/sac_segmentation.h>
 #include <pcl/segmentation/extract_polygonal_prism_data.h>
 #include <pcl/segmentation/extract_clusters.h>
+#include <pcl/features/normal_3d.h>
 
 #include <pcl/filters/voxel_grid.h>
 #include <pcl/filters/extract_indices.h>
@@ -167,12 +168,15 @@ void updatePCLViewer() {
 }
 
 double mean_to_point_dist(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr
-                          cloud, pcl::PointIndices& idxs, Eigen::Vector4f point) {
-    Eigen::Vector4f centroid;
+                          cloud, pcl::PointIndices& idxs, Eigen::Vector4d point,
+                          Eigen::Affine3d transform) {
+    Eigen::Vector4d centroid;
     if (pcl::compute3DCentroid(*cloud, idxs, centroid) != idxs.indices.size()) {
         ROS_WARN_STREAM("Cannot find centre of cluster");
     }
-    return (centroid - point).norm();
+    centroid(3) = 1.0;
+    ROS_INFO_STREAM("tfs point: " << transform * centroid);
+    return (transform * centroid - point).norm();
 }
 
 double rgb2gray(const pcl::PointXYZRGB& p) {
@@ -572,15 +576,19 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
         if (euclidean_clustering && objects->size() > 0) {
             clock_t tStart = clock();
             // Spawn a new thread to find tf!
-            geometry_msgs::TransformStamped transform;
-
-            // std::thread tf_thr([&transform, &msg]() ->void {
-            transform = tfBuffer->lookupTransform(world_frame,
-                                                  msg->header.frame_id,
-                                                  ros::Time(0), //acquisition_time - ros::Duration().fromSec(4),
-                                                  ros::Duration(0.2)
-                                                 );
-            // });
+            Eigen::Affine3d eigen_transf;
+            std::thread tf_thr([&eigen_transf, &msg]() ->void {
+                geometry_msgs::TransformStamped transform;
+                try{
+                    transform = tfBuffer->lookupTransform(world_frame,
+                    msg->header.frame_id,
+                    ros::Time(0), //acquisition_time - ros::Duration().fromSec(4),
+                    ros::Duration(0.2) );
+                } catch (tf2::TransformException ex) {
+                    ROS_ERROR("Error tf lookup %s", ex.what());
+                }
+                eigen_transf = tf2::transformToEigen(transform);
+            });
 
             // Creating the KdTree object for the search method of the extraction
             pcl::search::KdTree<pcl::PointXYZRGB>::Ptr tree(
@@ -591,7 +599,7 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
             pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> ec;
             // TODO: Extract the numbers as dynamic param
             ec.setClusterTolerance(0.02); // 2cm
-            ec.setMinClusterSize(200);
+            ec.setMinClusterSize(100);
             ec.setMaxClusterSize(250000);
             ec.setSearchMethod(tree);
             ec.setInputCloud(objects);
@@ -599,7 +607,7 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
             ROS_INFO_STREAM("Found " << cluster_indices.size() << " clusters.");
 
             // Join tf thread
-            // tf_thr.join();
+            tf_thr.join();
 
             ROS_INFO(">> CPU Time euclidean clustering: %.2fms",
                      (double)(clock() - tStart) / CLOCKS_PER_SEC * 1000);
@@ -607,11 +615,12 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
             if (cluster_indices.size() > 0) {
                 // Get a cluster
                 tStart = clock();
-                Eigen::Vector4f master_point(0.0, 0.20, 1.0, 1);
+                Eigen::Vector4d master_point(0.5, 0.2, 0.75, 1);
                 double min_dist = DBL_MAX;
                 int min_idx = 0;
                 for (int i = 0; i < cluster_indices.size(); ++i) {
-                    double dist = mean_to_point_dist(objects, cluster_indices[i], master_point);
+                    double dist = mean_to_point_dist(objects, cluster_indices[i],
+                                                     master_point, eigen_transf);
                     if (dist < min_dist) {
                         min_dist = dist;
                         min_idx = i;
@@ -633,12 +642,15 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
                     add_floor_2_mesh(cobj, coefficients);
 
                     // Transform
-                    Eigen::Affine3d eigen_transf = tf2::transformToEigen(transform);
                     pcl::transformPointCloud(*cobj, *cobj_world_frame, eigen_transf);
 
                     Eigen::Vector4f centroid;
                     pcl::compute3DCentroid(*cobj_world_frame, centroid);
                     ROS_WARN_STREAM("Centroid: " << centroid);
+
+                    Eigen::Vector4f minPoint, maxPoint;
+                    pcl::getMinMax3D(*cobj_world_frame, minPoint, maxPoint);
+                    ROS_WARN_STREAM("min max points: " << minPoint << " " << maxPoint);
 
                     sensor_msgs::PointCloud2 segm_obj_world_frame;
                     pcl::toROSMsg(*cobj_world_frame, segm_obj_world_frame);
@@ -653,6 +665,9 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
                     segm_msg.centroid.x = centroid.x();
                     segm_msg.centroid.y = centroid.y();
                     segm_msg.centroid.z = centroid.z();
+                    segm_msg.size.x = maxPoint.x() - minPoint.x();
+                    segm_msg.size.y = maxPoint.y() - minPoint.y();
+                    segm_msg.size.z = maxPoint.z() - minPoint.z();
                     cluster_pub.publish(segm_msg);
                     ROS_INFO(">> CPU Time cluster selection and publishing: %.2fms",
                              (double)(clock() - tStart) / CLOCKS_PER_SEC * 1000);
@@ -768,7 +783,7 @@ void dynamic_recongifure_callback(
 }
 
 bool request_pointcloud_callback(
-    std_srvs::Empty::Request&   req,
+    std_srvs::Empty::Request&    req,
     std_srvs::Empty::Response& res) {
     ROS_INFO_STREAM("Received a request for processing!");
     request_pointcloud = true;

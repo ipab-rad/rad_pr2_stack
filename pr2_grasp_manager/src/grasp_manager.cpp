@@ -112,6 +112,9 @@ void GraspManager::pcCB(
   ROS_INFO("Got PointCloud!");
   grasp_req_.input_pc = msg->cloud;
   grasp_req_.grasp_area_center = msg->centroid;
+  grasp_req_.grasp_area_length_x = msg->size.x * 100 + 14; // in cm
+  grasp_req_.grasp_area_length_y = msg->size.y * 100 + 14;
+
   // goal_.header.stamp = msg->header.stamp;
   std_msgs::Header now;
   now.stamp = ros::Time::now();
