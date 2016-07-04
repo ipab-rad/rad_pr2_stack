@@ -9,5 +9,6 @@
         <param name="simple_threshold_z_plane_height_max" type="double" value="1.5"/> -->
     </node>
 
+    <node pkg="topic_tools" type="transform" name="topic_tools_cloud_transform" output="screen" args="/plane_segmentator/clustered_object /plane_segmentator/clustered_object_cloud sensor_msgs/PointCloud2 'm.cloud'"/>  
     <!-- <node pkg="topic_tools" type="throttle" name="throttle" args="messages /plane_segmentator/segmented_objects_above 0.1 /haf_grasping/depth_registered/single_cloud/points_in_lcs"/> -->
 </launch>
