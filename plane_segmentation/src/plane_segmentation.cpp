@@ -175,7 +175,7 @@ double mean_to_point_dist(const pcl::PointCloud<pcl::PointXYZRGB>::Ptr
         ROS_WARN_STREAM("Cannot find centre of cluster");
     }
     centroid(3) = 1.0;
-    ROS_INFO_STREAM("tfs point: " << transform * centroid);
+    ROS_DEBUG_STREAM("[mean_to_point_dist] tf-ed point: " << transform * centroid);
     return (transform * centroid - point).norm();
 }
 
@@ -615,7 +615,7 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
             if (cluster_indices.size() > 0) {
                 // Get a cluster
                 tStart = clock();
-                Eigen::Vector4d master_point(0.5, 0.2, 0.75, 1);
+                Eigen::Vector4d master_point(0.5, -0.2, 0.75, 1);
                 double min_dist = DBL_MAX;
                 int min_idx = 0;
                 for (int i = 0; i < cluster_indices.size(); ++i) {
@@ -646,19 +646,16 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
 
                     Eigen::Vector4f centroid;
                     pcl::compute3DCentroid(*cobj_world_frame, centroid);
-                    ROS_WARN_STREAM("Centroid: " << centroid);
+                    ROS_DEBUG_STREAM("Evaluated centroid: " << centroid);
 
                     Eigen::Vector4f minPoint, maxPoint;
                     pcl::getMinMax3D(*cobj_world_frame, minPoint, maxPoint);
-                    ROS_WARN_STREAM("min max points: " << minPoint << " " << maxPoint);
+                    ROS_DEBUG_STREAM("min max points: " << minPoint << " " << maxPoint);
 
                     sensor_msgs::PointCloud2 segm_obj_world_frame;
                     pcl::toROSMsg(*cobj_world_frame, segm_obj_world_frame);
                     segm_obj_world_frame.header.frame_id = world_frame;
                     segm_obj_world_frame.header.stamp = ros::Time::now();
-                    // Transform object to world_frame
-                    // tf2::doTransform(segm_obj, segm_obj_world_frame, transform);
-                    // ROS_INFO_STREAM("ALALALALLALA: " << segm_obj_world_frame.header.frame_id);
 
                     pr2_picknplace_msgs::SegmentedObject segm_msg;
                     segm_msg.cloud = segm_obj_world_frame;
