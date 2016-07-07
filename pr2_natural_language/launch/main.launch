@@ -1,17 +1,27 @@
 <launch>
 
   <remap from="image_rect" to="/kinect2/qhd/image_color_rect"/>
+  <!-- <remap from="/kinect2/hd/camera_info" to="/kinect2/qhd/camera_info"/> -->
 
   <node name="apriltag_detector"
         pkg="apriltags_ros"
         type="apriltag_detector_node"
         output="screen">
-
+      <param name="image_transport" type="str" value="compressed"/>
       <rosparam param="tag_descriptions">
-        [{id: 1, size: 0.04, frame_id: banana},
-        {id: 2, size: 0.04, frame_id: tomato},
+        [
+        <!-- {id: 1, size: 0.04, frame_id: banana},  --> <!-- ID1 NOT GOOD -->
+        {id: 2, size: 0.04, frame_id: tomatoes},
         {id: 3, size: 0.04, frame_id: bowl},
-        {id: 6, size: 0.04, frame_id: spoon}]
+        {id: 4, size: 0.04, frame_id: carrots},
+        {id: 5, size: 0.04, frame_id: bananas},
+        {id: 6, size: 0.04, frame_id: spoon},
+        {id: 7, size: 0.04, frame_id: tomatoes},
+        {id: 8, size: 0.04, frame_id: saucepan},
+        {id: 9, size: 0.04, frame_id: milk},
+        {id: 10, size: 0.04, frame_id: cookies},
+        {id: 11, size: 0.04, frame_id: knife},
+        {id: 12, size: 0.04, frame_id: water},]
       </rosparam>
   </node>
   <node name="pr2_natural_language" pkg="pr2_natural_language" type="pr2_natural_language" output="screen" clear_params="true">

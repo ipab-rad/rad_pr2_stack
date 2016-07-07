@@ -28,9 +28,11 @@ class ParserWrapper:
   def handle_query(self, req):
     print req.query
     response = single_query_to_speech(req.query, self.graph)
-    self.look_at.publish("bowl")
-    print response
-    self.pr2_say(response)
+    print response[0] # Print speech response
+    print response[1] # Print set of action, target and tool
+
+    self.look_at.publish(response[1][0]) # Look at conversation item
+    self.pr2_say(response[0]) # Respond to requested query
     return True
 
 if __name__ == "__main__":

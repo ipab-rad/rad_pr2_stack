@@ -1,4 +1,4 @@
-# Parsing natural language commands related to a kitchen setting, to be carried out by a PR2. 
+# Parsing natural language commands related to a kitchen setting, to be carried out by a PR2.
 # Uses the Carnegie Mellon University Recipe Database (CURD): http://www.cs.cmu.edu/~ark/CURD/
 # June - July 2016
 # Stanford University x University of Edinburgh Bing Scholar Programme
@@ -21,16 +21,16 @@ from functools import reduce
 from os import listdir
 from os.path import isfile, join
 
-RECIPES_PATH = "annotated_recipes/"
+RECIPES_PATH = "/home/alex/pr2_ws/src/annotated_recipes/"
 MEASURE_WORDS = {"cup", "cups", "spoon", "spoons", "teaspoon", "teaspoons", "tablespoon", "tablespoons", "pinch", "inch", "cm", "ounce", "pound"}
 DELIM = ",| and | or "
 YES_WORDS = {"egg", "eggs", "electric", "nonstick", "pan", "oven", "white", "red", "brown", "set"}
 CAT = {"ACTION", "TOOL", "TARGET"}
 
-# Graphical representation of a kitchen 
+# Graphical representation of a kitchen
 class KitchenGraph:
 	def __init__(self):
-		# item --> CATEGORY (ACTION, TARGET, or TOOL) 
+		# item --> CATEGORY (ACTION, TARGET, or TOOL)
 		self.nodes = collections.defaultdict(str)
 
 		# edge (A,B) --> frequency weight
@@ -48,14 +48,14 @@ class KitchenGraph:
 		temp_nodes = set()
 		for key, value in new_annotation.iteritems():
 			new_annotation[key] = value.replace("\"", "") # Stripping quotes from parsed data
-			if key is not "PRODUCT": 
+			if key is not "PRODUCT":
 				for ing in new_annotation[key].split(","):
 					ing = ing.strip()
 					if ing is not "":
 						if ing in self.nodes and key is not self.nodes[ing]: #same node, different labels
 							ing += " (" + key + ")"
 						temp_nodes.add(ing)
-						self.nodes[ing] = key 
+						self.nodes[ing] = key
 
 		# Updating neighbors
 		for node in temp_nodes:
@@ -123,7 +123,7 @@ def simplify_parsed(parsed_annotation):
 			tagged = nltk.pos_tag(tokens)
 			# Preserve if only 2 or fewer words
 			if len(tagged) > 2:
-				out_list = [] 
+				out_list = []
 				for pair in tagged:
 					if pair[0] in YES_WORDS:
 						out_list.append(pair[0])
@@ -136,7 +136,7 @@ def simplify_parsed(parsed_annotation):
 		output = ", ".join(outs)
 		if output is not "": new_parsing[key] = output.lower()
 		else: new_parsing[key] = val.lower()
-		
+
 		# if len(outs) > 0: new_parsing[key] = ", ".join(outs)
 		# else: new_parsing[key] = val
 
@@ -214,6 +214,13 @@ def separate(args, recipe_space, parsed_annotation):
 	if args[5] is not "": parsed_annotation["ACTION"] = args[5]
 	else: parsed_annotation["ACTION"] = "separate"
 
+# FORM: serve(ingredient ing, string manner)
+# manner can be null
+def serve(args, recipe_space, parsed_annotation):
+	if args[0] in recipe_space: parsed_annotation["TARGET"] = recipe_space[args[0]]
+	parsed_annotation["ACTION"] = "serve"
+	if args[1] is not "": parsed_annotation["ACTION"] += " " + args[1]
+
 # Given a text instruction, output a mapping of (ACTION --> x, TARGET --> y, TOOL --> z)
 def parse_annotation(full_line, recipe_space, graph):
 
@@ -245,6 +252,8 @@ def parse_annotation(full_line, recipe_space, graph):
 			do(args_split, recipe_space, parsed_annotation)
 		elif rule == "separate":
 			separate(args_split, recipe_space, parsed_annotation)
+		elif rule == "serve":
+			serve(args_split, recipe_space, parsed_annotation)
 		new_parsing = simplify_parsed(parsed_annotation)
 		graph.update_graph(new_parsing, og_text)
 
@@ -314,7 +323,7 @@ def parse_query(query, graph, query_space):
 
 	# (1) PLAN A: all 3 categories appear in query
 	good_phrases += [phrase for phrase in phrases if phrase in graph.nodes]
-	pre_candidates = collections.defaultdict(set) 
+	pre_candidates = collections.defaultdict(set)
 	for phrase in good_phrases:
 		pre_candidates[graph.nodes[phrase]].add(phrase)
 		confidences[graph.nodes[phrase]] += 1
@@ -356,7 +365,7 @@ def parse_query(query, graph, query_space):
 			sorted_possibilities = sorted(overlap_map, key=overlap_map.get, reverse=True)
 
 			# print "TOP SUGGESTIONS"
-			# for sp in sorted_possibilities: 
+			# for sp in sorted_possibilities:
 			# 	print sp, overlap_map[sp]
 
 			cand[missing_cat[0]] = sorted_possibilities[0]
@@ -375,7 +384,7 @@ def parse_query(query, graph, query_space):
 				edge = (min(item, last_item), max(item, last_item))
 				if graph.edges[edge] > 0: matches += 1
 			if matches >= len(found): cand[cat] = last_item
-	if "ACTION" in cand and "TOOL" not in cand: 
+	if "ACTION" in cand and "TOOL" not in cand:
 		tool = get_tool_from_action(cand["ACTION"], graph)
 		if tool is not None: cand["TOOL"] = tool
 		confidences["TOOL"] = 0
@@ -403,26 +412,26 @@ def PR2_speech(query_result):
 				out += "I'm assuming you're talking about the " + parsed["TARGET"] + "? I can " + parsed["ACTION"] + " those! "
 			else:
 				options = ["You give great instructions! I can definitely help you " + parsed["ACTION"] + " the " + parsed["TARGET"] + ". ",
-				"I've got it -- " + parsed["ACTION"] + " the " + parsed["TARGET"] + ", coming up! "]
+				"I've got it, " + parsed["ACTION"] + " the " + parsed["TARGET"] + ", coming up! ", "Ooh, I'd love to " + parsed["ACTION"] + " the " + parsed["TARGET"] + "! "]
 				out += random.choice(options)
-		else: 
+		else:
 			out += "I see you want to " + parsed["ACTION"] + " something, but I'm not sure what. "
 
 		if "TOOL" in parsed:
-			if confidences["TOOL"] == 0: 
+			if confidences["TOOL"] == 0:
 				options = ["Might I suggest we use a " + parsed["TOOL"] + " for that? ", "I think a " + parsed["TOOL"] + " would be handy here!"]
 				out += random.choice(options)
-			else: 
+			else:
 				out += "We'll use the " + parsed["TOOL"] + " as you suggested. "
 	else:
 		if "TARGET" in parsed:
 			out += "Ah, the " + parsed["TARGET"] + ". I'm not sure what you want me to do with them, though. "
 		else: # TARGET and ACTION are empty
 			if "TOOL" in parsed:
-				out += "I'm not sure I caught any ingredients in there..."
-				if confidences["TOOL"] == 0: 
+				out += "Ah, I'm not sure I caught any ingredients in there. "
+				if confidences["TOOL"] == 0:
 					out += "However, based on what I've heard so far, I think a " + parsed["TOOL"] + " may be helpful for this scenario. "
-				else: 
+				else:
 					out += "I do understand your desire to use a " + parsed["TOOL"] + ", and we definitely shall! You'll just have to clarify the rest for me. "
 			else: # TARGET and ACTION and TOOL are empty
 				out += "I'm a bit at a loss here, sorry about that! Care to elaborate?"
@@ -467,6 +476,8 @@ def main():
 	process_recipes(graph)
 	stemmer = PorterStemmer()
 
+	print graph.to_string()
+
 	# Query model
 	# Within recipe space, keeps stack of previously mentioned items
 	query_space = collections.defaultdict(list)
@@ -479,9 +490,9 @@ def main():
 			words = [stemmer.stem(word) for word in query.split(" ")]
 			stemmed_query = ' '.join(words)
 			result = parse_query(stemmed_query, graph, query_space)
-		
+
 		print "\nPR2 speech:"
-		print graph.PR2_speech(result)
+		print PR2_speech(result)
 		if result is not None:
 			parsed = result[0]
 			confidences = result[1]
@@ -499,9 +510,9 @@ if __name__ == "__main__":
 
 # TO DO ~~~~~~~~~~
 
-# SEND LIST of TOOLS / April tag items!! 
+# SEND LIST of TOOLS / April tag items!!
 
-# what the PR2 should look at during the speech 
+# run some tests / train and test sets
 
 # what happens when item has multiple labels (can be tool, target, etc. in different contexts???)
 
@@ -518,4 +529,5 @@ if __name__ == "__main__":
 
 # FUTURE WORK: probabilistic model when guessting missing categories -- based on database & what user says
 # future work section: PR2 can ask clarifying questions!
+
 

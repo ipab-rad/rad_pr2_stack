@@ -1,10 +1,10 @@
 arm: right_arm
-add_table: true
+add_table: false
 max_planning_time: 10.0
-use_touch_pads: true
+use_touch_pads: false
 
 # Simple gripper (if use_touch_pads = false)
-open_gripper_pos: 0.06
+open_gripper_pos: 0.01
 close_gripper_pos: 0.01
 close_effort: 100.0
 
