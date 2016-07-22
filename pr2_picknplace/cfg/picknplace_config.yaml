@@ -1,5 +1,5 @@
 arm: right_arm
-add_table: true
+add_table: false
 max_planning_time: 10.0
 use_touch_pads: true
 

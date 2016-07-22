@@ -79,12 +79,16 @@ class PickPlaceAction {
     bool PickCube(geometry_msgs::PoseStamped ps);
     bool PlaceCube(geometry_msgs::PoseStamped ps);
     bool MoveTo(geometry_msgs::PoseStamped ps);
+    bool Push(geometry_msgs::PoseStamped ps);
 
     bool Plan(moveit::core::RobotState start, moveit::core::RobotState end,
               moveit::planning_interface::MoveGroup::Plan& plan,
               geometry_msgs::Quaternion orient_constraint =
                   geometry_msgs::Quaternion());
     moveit::core::RobotState RobotStateFromPose(geometry_msgs::Pose p);
+
+    bool ConvertPoseToGrabPose(const geometry_msgs::PoseStamped& ps,
+                               geometry_msgs::Pose& ps_out);
 
     void SendGripperCommand(float position, float max_effort = -1.0f);
     bool CheckGripperFinished();

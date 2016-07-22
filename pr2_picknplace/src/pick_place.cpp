@@ -124,7 +124,7 @@ void PickPlaceAction::init() {
   sensor_grabbing = false;
   sensor_releasing = false;
 
-  is_gripper_empty = true;
+  is_gripper_empty = (use_touch_pads) ? true : false;
 }
 
 void PickPlaceAction::rosSetup() {
@@ -142,8 +142,8 @@ void PickPlaceAction::rosSetup() {
             move_group_arm.getPlanningFrame().c_str());
 
   // Name of the end-effector link for this group.
-  ROS_DEBUG("[PICKPLACEACTION] Reference frame: %s",
-            move_group_arm.getEndEffectorLink().c_str());
+  ROS_INFO("[PICKPLACEACTION] Reference frame: %s",
+           move_group_arm.getEndEffectorLink().c_str());
   // ROS_INFO_STREAM("State: " << *move_group_arm.getCurrentState());
   ROS_INFO_STREAM("[PICKPLACEACTION] Current " <<
                   move_group_arm.getCurrentPose().pose);
@@ -227,9 +227,15 @@ void PickPlaceAction::executeCB() {
       success &= PlaceCube(ps);
       break;
     case pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST:
-      ROS_WARN("Move Request experimental yet.");
       success &= MoveTo(ps);
       break;
+    case pr2_picknplace_msgs::PicknPlaceGoal::PUSH_REQUEST:
+      ROS_WARN("PUSH Request experimental yet.");
+      success &= Push(ps);
+      break;
+    default:
+      ROS_ERROR("Wrong request id.");
+      success = false;
   }
 
   result_.success = success;
@@ -304,12 +310,9 @@ void PickPlaceAction::AddAttachedCollBox(geometry_msgs::Pose p) {
   ros::WallDuration(co_wait_).sleep();
 }
 
-bool PickPlaceAction::PickCube(geometry_msgs::PoseStamped ps) {
-  ROS_INFO_STREAM("[PICKPLACEACTION] Starting Pick planning ...");
-  moveit::planning_interface::MoveGroup::Plan pregrasp_plan;
-  moveit::planning_interface::MoveGroup::Plan grasp_plan;
-  moveit::planning_interface::MoveGroup::Plan postgrasp_plan;
-
+bool PickPlaceAction::ConvertPoseToGrabPose(
+  const geometry_msgs::PoseStamped& ps,
+  geometry_msgs::Pose& ps_out) {
   std::string pr2_frame = move_group_arm.getPlanningFrame();
   pr2_frame.erase(0, 1);
   // ROS_INFO_STREAM("PR2 planning frame " << pr2_frame.c_str());
@@ -351,6 +354,7 @@ bool PickPlaceAction::PickCube(geometry_msgs::PoseStamped ps) {
     transform.transform.rotation.w = q.w();
   } catch (tf2::TransformException& ex) {
     ROS_ERROR("%s", ex.what());
+    return false;
   }
 
   geometry_msgs::PoseStamped pso;
@@ -359,10 +363,22 @@ bool PickPlaceAction::PickCube(geometry_msgs::PoseStamped ps) {
     ROS_ERROR("%s", ex.what());
     return false;
   }
-  geometry_msgs::Pose p = pso.pose;
+  // Update pose
+  ps_out = pso.pose;
+  return true;
+}
 
-  ROS_DEBUG_STREAM("Input " << ps);
-  ROS_DEBUG_STREAM("Output " << pso);
+bool PickPlaceAction::PickCube(geometry_msgs::PoseStamped ps) {
+  ROS_INFO_STREAM("[PICKPLACEACTION] Starting Pick planning ...");
+  moveit::planning_interface::MoveGroup::Plan pregrasp_plan;
+  moveit::planning_interface::MoveGroup::Plan grasp_plan;
+  moveit::planning_interface::MoveGroup::Plan postgrasp_plan;
+
+  geometry_msgs::Pose p;
+  if (!ConvertPoseToGrabPose(ps, p)) {
+    ROS_WARN("[PickCube] Cannot convert pose!");
+    return false;
+  }
 
   geometry_msgs::Pose pregrasp_pose(p);
   pregrasp_pose.position.z += 0.1;
@@ -440,63 +456,22 @@ bool PickPlaceAction::PlaceCube(geometry_msgs::PoseStamped ps) {
   moveit::planning_interface::MoveGroup::Plan place_plan;
   moveit::planning_interface::MoveGroup::Plan postplace_plan;
 
-  std::string pr2_frame = move_group_arm.getPlanningFrame();
-  pr2_frame.erase(0, 1);
-
-  geometry_msgs::TransformStamped transform;
-  try {
-    Eigen::Translation3d t0;
-    t0 = Eigen::Translation3d(ps.pose.position.x,
-                              ps.pose.position.y,
-                              ps.pose.position.z);
-
-    // Tabletop to OdomCombined transformation
-    Eigen::Affine3d t1 =
-      tf2::transformToEigen(tfBuffer.lookupTransform(pr2_frame,
-                                                     ps.header.frame_id,
-                                                     ros::Time(0)));
-    // Rotate Gripper 90 deg in Y axis
-    Eigen::Affine3d t2;
-    t2 = Eigen::AngleAxisd(0.5 * M_PI,  Eigen::Vector3d::UnitY());
-
-    // ToolFrame to WristFrame transformation
-    Eigen::Affine3d t3 =
-      tf2::transformToEigen(tfBuffer.lookupTransform(wrist_roll_link,
-                                                     gripper_tool_frame,
-                                                     ros::Time(0)));
-
-    Eigen::Affine3d t = t1 * t0 * t2 * t0.inverse();
-
-    ROS_INFO_STREAM("T3:\n" << t3.matrix());
-
-    transform.transform.translation.x = t.translation().x();
-    transform.transform.translation.y = t.translation().y();
-    transform.transform.translation.z = t.translation().z();
-
-    Eigen::Quaterniond q(t.rotation());
-    transform.transform.rotation.x = q.x();
-    transform.transform.rotation.y = q.y();
-    transform.transform.rotation.z = q.z();
-    transform.transform.rotation.w = q.w();
-  } catch (tf2::TransformException& ex) {
-    ROS_ERROR("%s", ex.what());
-  }
-
-  geometry_msgs::PoseStamped pso;
-  try { tf2::doTransform(ps, pso, transform); }
-  catch (tf2::TransformException ex) {
-    ROS_ERROR("%s", ex.what());
+  geometry_msgs::Pose p;
+  if (!ConvertPoseToGrabPose(ps, p)) {
+    ROS_WARN("[PlaceCube] Cannot convert pose!");
     return false;
   }
-  geometry_msgs::Pose p = pso.pose;
 
-  ROS_DEBUG_STREAM("Input " << ps);
-  ROS_DEBUG_STREAM("Output " << pso);
+  geometry_msgs::PoseStamped ps_offset(ps);
+  ps_offset.pose.position.z += 0.1;
+  geometry_msgs::Pose preplace_pose;
 
-  geometry_msgs::Pose preplace_pose(p);
-  preplace_pose.position.z += 0.1;
-  geometry_msgs::Pose postplace_pose(p);
-  postplace_pose.position.z += 0.1;
+  if (!ConvertPoseToGrabPose(ps_offset, preplace_pose)) {
+    ROS_WARN("[PlaceCube] Cannot convert pose!");
+    return false;
+  }
+  geometry_msgs::Pose postplace_pose(preplace_pose);
+  ROS_INFO_STREAM("Pose offset: " << preplace_pose);
 
   ROS_DEBUG_STREAM("Preplace " << preplace_pose);
   ROS_DEBUG_STREAM("Place " << p);
@@ -550,58 +525,11 @@ bool PickPlaceAction::PlaceCube(geometry_msgs::PoseStamped ps) {
 bool PickPlaceAction::MoveTo(geometry_msgs::PoseStamped ps) {
   moveit::planning_interface::MoveGroup::Plan moveto_plan;
   // Do magic transforms here
-
-  std::string pr2_frame = move_group_arm.getPlanningFrame();
-  pr2_frame.erase(0, 1);
-
-  geometry_msgs::TransformStamped transform;
-  try {
-    Eigen::Translation3d t0;
-    t0 = Eigen::Translation3d(ps.pose.position.x,
-                              ps.pose.position.y,
-                              ps.pose.position.z);
-
-    // Tabletop to OdomCombined transformation
-    Eigen::Affine3d t1 =
-      tf2::transformToEigen(tfBuffer.lookupTransform(pr2_frame,
-                                                     ps.header.frame_id,
-                                                     ros::Time(0)));
-    // Rotate Gripper 90 deg in Y axis
-    Eigen::Affine3d t2;
-    t2 = Eigen::AngleAxisd(0.5 * M_PI,  Eigen::Vector3d::UnitY());
-
-    // ToolFrame to WristFrame transformation
-    Eigen::Affine3d t3 =
-      tf2::transformToEigen(tfBuffer.lookupTransform(wrist_roll_link,
-                                                     gripper_tool_frame,
-                                                     ros::Time(0)));
-
-    Eigen::Affine3d t = t1 * t0 * t2 * t0.inverse();
-
-    ROS_INFO_STREAM("T3:\n" << t3.matrix());
-
-    transform.transform.translation.x = t.translation().x();
-    transform.transform.translation.y = t.translation().y();
-    transform.transform.translation.z = t.translation().z();
-
-    Eigen::Quaterniond q(t.rotation());
-    transform.transform.rotation.x = q.x();
-    transform.transform.rotation.y = q.y();
-    transform.transform.rotation.z = q.z();
-    transform.transform.rotation.w = q.w();
-  } catch (tf2::TransformException& ex) {
-    ROS_ERROR("%s", ex.what());
-  }
-
-  geometry_msgs::PoseStamped pso;
-  try { tf2::doTransform(ps, pso, transform); }
-  catch (tf2::TransformException ex) {
-    ROS_ERROR("%s", ex.what());
+  geometry_msgs::Pose p;
+  if (!ConvertPoseToGrabPose(ps, p)) {
+    ROS_WARN("[MoveTo] Cannot convert pose!");
     return false;
   }
-  geometry_msgs::Pose p = pso.pose;
-  p.position.z += 0.1;
-  // End tfs
 
   moveit::core::RobotState moveto_robot_state = RobotStateFromPose(p);
 
@@ -619,6 +547,86 @@ bool PickPlaceAction::MoveTo(geometry_msgs::PoseStamped ps) {
     ros::WallDuration(exec_wait_).sleep();
   } else {
     ROS_INFO_STREAM("[PICKPLACEACTION] Failed to find a plan for pose: "
+                    << pick_place_goal_.object_pose);
+  }
+
+  return success;
+}
+
+bool PickPlaceAction::Push(geometry_msgs::PoseStamped ps) {
+  ROS_INFO_STREAM("[PUSHACTION] Starting Push planning ...");
+  moveit::planning_interface::MoveGroup::Plan prepush_plan;
+  moveit::planning_interface::MoveGroup::Plan push_plan;
+  moveit::planning_interface::MoveGroup::Plan postpush_plan;
+  moveit::planning_interface::MoveGroup::Plan home_plan;
+
+  geometry_msgs::Pose p;
+  if (!ConvertPoseToGrabPose(ps, p)) {
+    ROS_WARN("[PlaceCube] Cannot convert pose!");
+    return false;
+  }
+
+  geometry_msgs::PoseStamped ps_offset(ps);
+  // Change this based on the rotation around z axis
+  ps_offset.pose.position.x -= 0.1;
+  ps_offset.pose.position.y -= 0.0;
+  geometry_msgs::Pose prepush_pose;
+
+  if (!ConvertPoseToGrabPose(ps_offset, prepush_pose)) {
+    ROS_WARN("[pushCube] Cannot convert pose!");
+    return false;
+  }
+  geometry_msgs::Pose postpush_pose(prepush_pose);
+
+  ROS_INFO_STREAM("Prepush " << prepush_pose);
+  ROS_INFO_STREAM("Push " << p);
+  ROS_INFO_STREAM("Postpush " << postpush_pose);
+
+  moveit::core::RobotState home_robot_state = *move_group_arm.getCurrentState();
+  moveit::core::RobotState prepush_robot_state = RobotStateFromPose(prepush_pose);
+  moveit::core::RobotState push_robot_state = RobotStateFromPose(p);
+  moveit::core::RobotState postpush_robot_state = RobotStateFromPose(
+                                                    postpush_pose);
+
+  bool success = Plan(*move_group_arm.getCurrentState(),
+                      prepush_robot_state, prepush_plan);
+  ROS_INFO_STREAM("[PUSHACTION] Planning 'prepush': " <<
+                  ((success) ? "success" : "fail"));
+  success &= Plan(prepush_robot_state, push_robot_state, push_plan);
+  ROS_INFO_STREAM("[PUSHACTION] Planning 'push': " <<
+                  ((success) ? "success" : "fail"));
+  success &= Plan(push_robot_state, postpush_robot_state, postpush_plan);
+  ROS_INFO_STREAM("[PUSHACTION] Planning 'postpush': " <<
+                  ((success) ? "success" : "fail"));
+  success &= Plan(postpush_robot_state, home_robot_state, home_plan);
+  ROS_INFO_STREAM("[PUSHACTION] Planning 'home': " <<
+                  ((success) ? "success" : "fail"));
+
+  if (success) {
+    ROS_INFO_STREAM("[PUSHACTION] Executing on the robot ...");
+    // Close grippers
+    if (use_touch_pads) {
+      success &= SensorGrab();
+    } else {
+      SendGripperCommand(close_gripper_pos_, close_effort_);
+    }
+
+    if (success) { success &= move_group_arm.execute(prepush_plan);}
+    ros::WallDuration(exec_wait_).sleep();
+
+    // Confirm that the grippers have closed by now
+    if (success) { success &= CheckGripperFinished(); }
+
+    if (success) { success &= move_group_arm.execute(push_plan); }
+    ros::WallDuration(exec_wait_).sleep();
+
+
+    success &= move_group_arm.execute(postpush_plan);
+    success &= move_group_arm.execute(home_plan);
+    ROS_INFO_STREAM("[PUSHACTION] MoveIt execution of push plan: "
+                    << ((success) ? "success" : "fail"));
+  } else {
+    ROS_INFO_STREAM("[PUSHACTION] Failed to find a plan for pose: "
                     << pick_place_goal_.object_pose);
   }
 
