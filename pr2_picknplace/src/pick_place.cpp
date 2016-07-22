@@ -623,18 +623,18 @@ bool PickPlaceAction::Push(geometry_msgs::PoseStamped ps) {
 
   if (success) {
     ROS_INFO_STREAM("[PUSHACTION] Executing on the robot ...");
-    // Close grippers
-    if (use_touch_pads) {
-      success &= SensorGrab();
-    } else {
-      SendGripperCommand(close_gripper_pos_, close_effort_);
-    }
+    // // Close grippers
+    // if (use_touch_pads) {
+    //   success &= SensorGrab();
+    // } else {
+    //   SendGripperCommand(close_gripper_pos_, close_effort_);
+    // }
 
     if (success) { success &= move_group_arm.execute(prepush_plan);}
     ros::WallDuration(exec_wait_).sleep();
 
-    // Confirm that the grippers have closed by now
-    if (success) { success &= CheckGripperFinished(); }
+    // // Confirm that the grippers have closed by now
+    // if (success) { success &= CheckGripperFinished(); }
 
     if (success) { success &= move_group_arm.execute(push_plan); }
     ros::WallDuration(exec_wait_).sleep();
@@ -686,7 +686,7 @@ bool PickPlaceAction::Plan(moveit::core::RobotState start,
 
 moveit::core::RobotState PickPlaceAction::CreateEmptyRobotState() {
   moveit::core::RobotState state(*move_group_arm.getCurrentState());
-  state.setToDefaultValues();
+  // state.setToDefaultValues();
   return state;
 }
 
@@ -755,7 +755,7 @@ bool PickPlaceAction::CheckGripperFinished() {
         actionlib::SimpleClientGoalState::SUCCEEDED) {
       return true;
     } else {
-      ROS_WARN("[PICKPLACEACTION] The gripper failed to open.");
+      ROS_WARN("[PICKPLACEACTION] The gripper failed to reach state.");
       return false;
     }
   }
