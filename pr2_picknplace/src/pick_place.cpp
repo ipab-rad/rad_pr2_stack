@@ -389,22 +389,27 @@ bool PickPlaceAction::PickCube(geometry_msgs::PoseStamped ps) {
   ROS_DEBUG_STREAM("Grasp " << p);
   ROS_DEBUG_STREAM("Postgrasp " << postgrasp_pose);
 
-  moveit::core::RobotState pregrasp_robot_state =
-    RobotStateFromPose(pregrasp_pose);
-  moveit::core::RobotState grasp_robot_state = RobotStateFromPose(p);
-  moveit::core::RobotState postgrasp_robot_state =
-    RobotStateFromPose(postgrasp_pose);
+  moveit::core::RobotState pregrasp_robot_state = CreateEmptyRobotState();
+  moveit::core::RobotState grasp_robot_state = CreateEmptyRobotState();
+  moveit::core::RobotState postgrasp_robot_state = CreateEmptyRobotState();
+  bool success = RobotStateFromPose(pregrasp_pose, pregrasp_robot_state);
+  success &= RobotStateFromPose(p, grasp_robot_state);
+  success &= RobotStateFromPose(postgrasp_pose, postgrasp_robot_state);
 
-  bool success = Plan(*move_group_arm.getCurrentState(),
-                      pregrasp_robot_state,
-                      pregrasp_plan);
-  ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'pregrasp': " <<
-                  ((success) ? "success" : "fail"));
-  success &= Plan(pregrasp_robot_state, grasp_robot_state,
-                  grasp_plan);
-  ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'grasp': " <<
-                  ((success) ? "success" : "fail"));
-  success &= Plan(grasp_robot_state, postgrasp_robot_state, postgrasp_plan);
+  if (!success) {
+    ROS_WARN_STREAM("Cannot get robot pose for some of the needed poses.");
+  } else {
+    success &= Plan(*move_group_arm.getCurrentState(),
+                    pregrasp_robot_state,
+                    pregrasp_plan);
+    ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'pregrasp': " <<
+                    ((success) ? "success" : "fail"));
+    success &= Plan(pregrasp_robot_state, grasp_robot_state,
+                    grasp_plan);
+    ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'grasp': " <<
+                    ((success) ? "success" : "fail"));
+    success &= Plan(grasp_robot_state, postgrasp_robot_state, postgrasp_plan);
+  }
   ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'postgrasp': " <<
                   ((success) ? "success" : "fail"));
 
@@ -434,10 +439,9 @@ bool PickPlaceAction::PickCube(geometry_msgs::PoseStamped ps) {
 
     ros::WallDuration(0.1).sleep();  // Gripper delay for better grippage
 
-    if (success) {
-      ROS_INFO("Executing postgrasp plan");
-      success &= move_group_arm.execute(postgrasp_plan);
-    }
+    ROS_INFO("Executing postgrasp plan");
+    success &= move_group_arm.execute(postgrasp_plan);
+
     if (is_gripper_empty) ROS_WARN("gripper empty");
     if (success) { success &= !is_gripper_empty; }
 
@@ -477,21 +481,26 @@ bool PickPlaceAction::PlaceCube(geometry_msgs::PoseStamped ps) {
   ROS_DEBUG_STREAM("Place " << p);
   ROS_DEBUG_STREAM("Postplace " << postplace_pose);
 
-  moveit::core::RobotState preplace_robot_state = RobotStateFromPose(
-                                                    preplace_pose);
-  moveit::core::RobotState place_robot_state = RobotStateFromPose(p);
-  moveit::core::RobotState postplace_robot_state = RobotStateFromPose(
-                                                     postplace_pose);
+  moveit::core::RobotState preplace_robot_state = CreateEmptyRobotState();
+  moveit::core::RobotState place_robot_state = CreateEmptyRobotState();
+  moveit::core::RobotState postplace_robot_state = CreateEmptyRobotState();
+  bool success = RobotStateFromPose(preplace_pose, preplace_robot_state);
+  success &= RobotStateFromPose(p, place_robot_state);
+  success &= RobotStateFromPose(postplace_pose, postplace_robot_state);
 
-  bool success = Plan(*move_group_arm.getCurrentState(),
-                      preplace_robot_state,
-                      preplace_plan);
-  ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'preplace': " <<
-                  ((success) ? "success" : "fail"));
-  success &= Plan(preplace_robot_state, place_robot_state, place_plan);
-  ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'place': " <<
-                  ((success) ? "success" : "fail"));
-  success &= Plan(place_robot_state, postplace_robot_state, postplace_plan);
+  if (!success) {
+    ROS_WARN_STREAM("Cannot get robot pose for some of the needed poses.");
+  } else {
+    success &= Plan(*move_group_arm.getCurrentState(),
+                    preplace_robot_state,
+                    preplace_plan);
+    ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'preplace': " <<
+                    ((success) ? "success" : "fail"));
+    success &= Plan(preplace_robot_state, place_robot_state, place_plan);
+    ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'place': " <<
+                    ((success) ? "success" : "fail"));
+    success &= Plan(place_robot_state, postplace_robot_state, postplace_plan);
+  }
   ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'postplace': " <<
                   ((success) ? "success" : "fail"));
 
@@ -511,7 +520,7 @@ bool PickPlaceAction::PlaceCube(geometry_msgs::PoseStamped ps) {
 
     if (success) { success &= CheckGripperFinished(); }
 
-    if (success) { success &= move_group_arm.execute(postplace_plan); }
+    success &= move_group_arm.execute(postplace_plan);
     ROS_INFO_STREAM("[PICKPLACEACTION] MoveIt execution of place plan: "
                     << ((success) ? "success" : "fail"));
   } else {
@@ -531,11 +540,15 @@ bool PickPlaceAction::MoveTo(geometry_msgs::PoseStamped ps) {
     return false;
   }
 
-  moveit::core::RobotState moveto_robot_state = RobotStateFromPose(p);
-
-  bool success = Plan(*move_group_arm.getCurrentState(),
-                      moveto_robot_state,
-                      moveto_plan);
+  moveit::core::RobotState moveto_robot_state = CreateEmptyRobotState();
+  bool success = RobotStateFromPose(p, moveto_robot_state);
+  if (!success) {
+    ROS_WARN_STREAM("Cannot get robot pose for some of the needed poses.");
+  } else {
+    success &= Plan(*move_group_arm.getCurrentState(),
+                    moveto_robot_state,
+                    moveto_plan);
+  }
   ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'MoveTo': " <<
                   ((success) ? "success" : "fail"));
   if (success) {
@@ -583,24 +596,30 @@ bool PickPlaceAction::Push(geometry_msgs::PoseStamped ps) {
   ROS_INFO_STREAM("Postpush " << postpush_pose);
 
   moveit::core::RobotState home_robot_state = *move_group_arm.getCurrentState();
-  moveit::core::RobotState prepush_robot_state = RobotStateFromPose(prepush_pose);
-  moveit::core::RobotState push_robot_state = RobotStateFromPose(p);
-  moveit::core::RobotState postpush_robot_state = RobotStateFromPose(
-                                                    postpush_pose);
+  moveit::core::RobotState prepush_robot_state = CreateEmptyRobotState();
+  moveit::core::RobotState push_robot_state = CreateEmptyRobotState();
+  moveit::core::RobotState postpush_robot_state = CreateEmptyRobotState();
+  bool success = RobotStateFromPose(prepush_pose, prepush_robot_state);
+  success &= RobotStateFromPose(p, push_robot_state);
+  success &= RobotStateFromPose(postpush_pose, postpush_robot_state);
 
-  bool success = Plan(*move_group_arm.getCurrentState(),
-                      prepush_robot_state, prepush_plan);
-  ROS_INFO_STREAM("[PUSHACTION] Planning 'prepush': " <<
-                  ((success) ? "success" : "fail"));
-  success &= Plan(prepush_robot_state, push_robot_state, push_plan);
-  ROS_INFO_STREAM("[PUSHACTION] Planning 'push': " <<
-                  ((success) ? "success" : "fail"));
-  success &= Plan(push_robot_state, postpush_robot_state, postpush_plan);
-  ROS_INFO_STREAM("[PUSHACTION] Planning 'postpush': " <<
-                  ((success) ? "success" : "fail"));
-  success &= Plan(postpush_robot_state, home_robot_state, home_plan);
-  ROS_INFO_STREAM("[PUSHACTION] Planning 'home': " <<
-                  ((success) ? "success" : "fail"));
+  if (!success) {
+    ROS_WARN_STREAM("Cannot get robot pose for some of the needed poses.");
+  } else {
+    success &= Plan(*move_group_arm.getCurrentState(),
+                    prepush_robot_state, prepush_plan);
+    ROS_INFO_STREAM("[PUSHACTION] Planning 'prepush': " <<
+                    ((success) ? "success" : "fail"));
+    success &= Plan(prepush_robot_state, push_robot_state, push_plan);
+    ROS_INFO_STREAM("[PUSHACTION] Planning 'push': " <<
+                    ((success) ? "success" : "fail"));
+    success &= Plan(push_robot_state, postpush_robot_state, postpush_plan);
+    ROS_INFO_STREAM("[PUSHACTION] Planning 'postpush': " <<
+                    ((success) ? "success" : "fail"));
+    success &= Plan(postpush_robot_state, home_robot_state, home_plan);
+    ROS_INFO_STREAM("[PUSHACTION] Planning 'home': " <<
+                    ((success) ? "success" : "fail"));
+  }
 
   if (success) {
     ROS_INFO_STREAM("[PUSHACTION] Executing on the robot ...");
@@ -665,13 +684,22 @@ bool PickPlaceAction::Plan(moveit::core::RobotState start,
   return success;
 }
 
-moveit::core::RobotState PickPlaceAction::RobotStateFromPose(
-  geometry_msgs::Pose p) {
+moveit::core::RobotState PickPlaceAction::CreateEmptyRobotState() {
   moveit::core::RobotState state(*move_group_arm.getCurrentState());
-  const robot_state::JointModelGroup* joint_model_group =
-    state.getJointModelGroup(move_group_arm.getName());
-  state.setFromIK(joint_model_group, p, gripper_tool_frame);
+  state.setToDefaultValues();
   return state;
+}
+
+bool PickPlaceAction::RobotStateFromPose(const geometry_msgs::Pose p,
+                                         moveit::core::RobotState& robot_sate) {
+  // state(*move_group_arm.getCurrentState());
+  const robot_state::JointModelGroup* joint_model_group =
+    robot_sate.getJointModelGroup(move_group_arm.getName());
+  bool ok = robot_sate.setFromIK(joint_model_group, p, gripper_tool_frame);
+  if (!ok) {
+    ROS_DEBUG_STREAM("Cannot get IK to go to " << p);
+  }
+  return ok;
 }
 
 void PickPlaceAction::SendGripperCommand(float position, float max_effort) {
