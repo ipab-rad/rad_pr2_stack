@@ -107,7 +107,8 @@ class PickPlaceAction {
     std::string gripper_controller;
     std::string gripper_tool_frame;
     bool add_table_;
-    double max_planning_time;
+    double max_planning_time_;
+    int num_planning_attempts_;
     double open_gripper_pos_;
     double close_gripper_pos_;
     double close_effort_;

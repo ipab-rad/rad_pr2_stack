@@ -71,10 +71,11 @@ PickPlaceAction::~PickPlaceAction() {
 void PickPlaceAction::loadParams() {
   ROS_INFO("[PICKPLACEACTION] Loading parameters.");
   ROS_INFO_STREAM("NAMESPACE: " << ns_);
-  if (!ros::param::get(ns_ + "/max_planning_time", max_planning_time)) {
+  if (!ros::param::get(ns_ + "/max_planning_time", max_planning_time_)) {
     ROS_WARN("[PICKPLACEACTION] Parameters were not loaded! Using default.");
   }
-  ros::param::param(ns_ + "/max_planning_time", max_planning_time, 10.0);
+  ros::param::param(ns_ + "/max_planning_time", max_planning_time_, 10.0);
+  ros::param::param(ns_ + "/num_planning_attempts", num_planning_attempts_, 1);
   ros::param::param(ns_ + "/add_table", add_table_, true);
   ros::param::param(ns_ + "/open_gripper_pos", open_gripper_pos_, 0.08);
   ros::param::param(ns_ + "/close_gripper_pos", close_gripper_pos_, 0.00);
@@ -109,7 +110,7 @@ void PickPlaceAction::loadParams() {
 
 
 
-  ROS_INFO_STREAM("Planning time: " << max_planning_time <<
+  ROS_INFO_STREAM("Planning time: " << max_planning_time_ <<
                   ", Adding table: " << (add_table_ ? "True" : "False") <<
                   ", OpenGripperPos: " << open_gripper_pos_ <<
                   ", CloseGripperPos: " << close_gripper_pos_ <<
@@ -119,7 +120,7 @@ void PickPlaceAction::loadParams() {
 
 void PickPlaceAction::init() {
   co_wait_ = 0.5f;
-  exec_wait_ = 0.0f;
+  exec_wait_ = 0.01f;
 
   sensor_grabbing = false;
   sensor_releasing = false;
@@ -135,7 +136,8 @@ void PickPlaceAction::rosSetup() {
   //   node_handle.advertise<moveit_msgs::DisplayTrajectory>(
   //     "/move_group/display_planned_path", 1, true);
 
-  move_group_arm.setPlanningTime(max_planning_time);  // Seconds
+  move_group_arm.setPlanningTime(max_planning_time_);  // Seconds
+  move_group_arm.setNumPlanningAttempts(num_planning_attempts_);
 
   // Name of the reference frame for this robot.
   ROS_DEBUG("[PICKPLACEACTION] Reference frame: %s",
@@ -560,6 +562,25 @@ bool PickPlaceAction::Push(geometry_msgs::PoseStamped ps) {
   moveit::planning_interface::MoveGroup::Plan postpush_plan;
   moveit::planning_interface::MoveGroup::Plan home_plan;
 
+  // Get orientation stats
+  Eigen::Quaterniond quat(ps.pose.orientation.w, ps.pose.orientation.x,
+                          ps.pose.orientation.y, ps.pose.orientation.z);
+  Eigen::Matrix<double, 3, 1> euler = quat.matrix().eulerAngles(0, 1, 2); // xyz
+  float yaw = euler(2, 0);
+  ROS_INFO_STREAM("yaw: " << yaw / M_PI * 180);
+
+  // Make the gripper face the direction or travel and incline it by 45 deg
+  Eigen::Quaterniond gripper_rot(
+    Eigen::AngleAxisd(yaw, Eigen::Vector3d::UnitX()) *
+    Eigen::AngleAxisd(-M_PI * 0.25, Eigen::Vector3d::UnitY())
+  );
+
+  // Convert poses
+  ps.pose.orientation.x = gripper_rot.x();
+  ps.pose.orientation.y = gripper_rot.y();
+  ps.pose.orientation.z = gripper_rot.z();
+  ps.pose.orientation.w = gripper_rot.w();
+
   geometry_msgs::Pose p;
   if (!ConvertPoseToGrabPose(ps, p)) {
     ROS_WARN("[PlaceCube] Cannot convert pose!");
@@ -568,10 +589,10 @@ bool PickPlaceAction::Push(geometry_msgs::PoseStamped ps) {
 
   geometry_msgs::PoseStamped ps_offset(ps);
   // Change this based on the rotation around z axis
-  ps_offset.pose.position.x -= 0.1;
-  ps_offset.pose.position.y -= 0.0;
-  geometry_msgs::Pose prepush_pose;
+  ps_offset.pose.position.x -= 0.1 * std::cos(yaw);
+  ps_offset.pose.position.y += 0.1 * std::sin(yaw);
 
+  geometry_msgs::Pose prepush_pose;
   if (!ConvertPoseToGrabPose(ps_offset, prepush_pose)) {
     ROS_WARN("[pushCube] Cannot convert pose!");
     return false;
@@ -604,24 +625,21 @@ bool PickPlaceAction::Push(geometry_msgs::PoseStamped ps) {
 
   if (success) {
     ROS_INFO_STREAM("[PUSHACTION] Executing on the robot ...");
-    // Close grippers
-    if (use_touch_pads) {
-      success &= SensorGrab();
-    } else {
-      SendGripperCommand(close_gripper_pos_, close_effort_);
-    }
+    ROS_DEBUG_STREAM("[PUSHACTION] Assuming grippers are closed.");
 
     if (success) { success &= move_group_arm.execute(prepush_plan);}
     ros::WallDuration(exec_wait_).sleep();
 
-    // Confirm that the grippers have closed by now
-    if (success) { success &= CheckGripperFinished(); }
-
-    if (success) { success &= move_group_arm.execute(push_plan); }
+    if (success) {
+      ROS_INFO_STREAM("[PUSHACTION] Executing push plan!");
+      success &= move_group_arm.execute(push_plan);
+    }
     ros::WallDuration(exec_wait_).sleep();
 
-
+    ROS_INFO_STREAM("[PUSHACTION] Returning hand back to postpush position.");
     success &= move_group_arm.execute(postpush_plan);
+    ros::WallDuration(exec_wait_).sleep();
+
     success &= move_group_arm.execute(home_plan);
     ROS_INFO_STREAM("[PUSHACTION] MoveIt execution of push plan: "
                     << ((success) ? "success" : "fail"));
@@ -690,7 +708,7 @@ bool PickPlaceAction::CheckGripperFinished() {
     // Use touch sensing fingers
     if (sensor_grabbing) {
       sensor_grabbing = false;
-      grab_client_->waitForResult(ros::Duration(max_planning_time));
+      grab_client_->waitForResult(ros::Duration(max_planning_time_));
       if (grab_client_->getState() == actionlib::SimpleClientGoalState::SUCCEEDED) {
         bool success = true;
         // grab_client_->getResult()->data.rtstate.realtime_controller_state ==
@@ -705,7 +723,7 @@ bool PickPlaceAction::CheckGripperFinished() {
       }
     } else if (sensor_releasing) {
       sensor_releasing = false;
-      release_client_->waitForResult(ros::Duration(max_planning_time));
+      release_client_->waitForResult(ros::Duration(max_planning_time_));
       if (release_client_->getState() ==
           actionlib::SimpleClientGoalState::SUCCEEDED) {
         ROS_INFO("Release Success");
@@ -722,7 +740,7 @@ bool PickPlaceAction::CheckGripperFinished() {
     }
   } else {
     // Use standard gripper
-    gripper_client_->waitForResult(ros::Duration(max_planning_time));
+    gripper_client_->waitForResult(ros::Duration(max_planning_time_));
     if (gripper_client_->getState() ==
         actionlib::SimpleClientGoalState::SUCCEEDED) {
       return true;
