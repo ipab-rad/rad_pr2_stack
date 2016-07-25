@@ -139,6 +139,10 @@ add_executable(pr2_natural_language
 ## Add cmake target dependencies of the executable
 ## same as for the library above
 # add_dependencies(pr2_natural_language ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(pr2_natural_language
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  pr2_natural_language_gencpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(pr2_natural_language
