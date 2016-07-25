@@ -1,0 +1,7 @@
+<launch>
+
+  <node name="pr2_head" pkg="pr2_head" type="pr2_head" output="screen" clear_params="true">
+    <rosparam file="$(find pr2_head)/cfg/config.yaml" command="load" />
+  </node>
+
+</launch>
