@@ -85,7 +85,9 @@ class PickPlaceAction {
               moveit::planning_interface::MoveGroup::Plan& plan,
               geometry_msgs::Quaternion orient_constraint =
                   geometry_msgs::Quaternion());
-    moveit::core::RobotState RobotStateFromPose(geometry_msgs::Pose p);
+    moveit::core::RobotState CreateEmptyRobotState();
+    bool RobotStateFromPose(const geometry_msgs::Pose p,
+                            moveit::core::RobotState& robot_sate);
 
     bool ConvertPoseToGrabPose(const geometry_msgs::PoseStamped& ps,
                                geometry_msgs::Pose& ps_out);
