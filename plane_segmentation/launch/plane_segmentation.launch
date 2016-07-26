@@ -1,9 +1,12 @@
 
 <launch>
-    <node pkg="plane_segmentation" type="plane_segmentation_node" name="plane_segmentator" output="screen" />
+    <node pkg="plane_segmentation" type="plane_segmentation_node" name="plane_segmentator" output="screen" >
+        <param name="subscribe_to_filtered" value="true" />
+    </node>
 
     <include file="$(find pr2_head)/launch/pr2_head.launch"/>
 
     <node pkg="topic_tools" type="transform" name="topic_tools_cloud_transform" output="screen" respawn="true" args="/plane_segmentator/clustered_object /plane_segmentator/clustered_object_cloud sensor_msgs/PointCloud2 'm.cloud'"/>
 
+    <include file="$(find robot_self_filter)/launch/self_filter_right_arm.launch"/>
 </launch>

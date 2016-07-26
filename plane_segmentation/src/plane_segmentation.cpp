@@ -128,6 +128,7 @@ double max_cluster_dist_new;
 
 // ROS vars
 std::string world_frame;
+bool subscribe_to_filtered;
 tf2_ros::Buffer* tfBuffer;
 tf2_ros::TransformListener* tfListener;
 bool request_pointcloud = false;
@@ -146,8 +147,7 @@ pcl::PolygonMesh mesh;
 // PCL Viewer
 boost::shared_ptr<pcl::visualization::PCLVisualizer> pclViewer(
     new pcl::visualization::PCLVisualizer("Plane segmentation"));
-boost::shared_ptr<pcl::visualization::PCLVisualizer> meshViewer(
-    new pcl::visualization::PCLVisualizer("3D mesh viewer"));
+boost::shared_ptr<pcl::visualization::PCLVisualizer> meshViewer;
 
 void updatePCLViewer() {
     pclViewer->removeAllPointClouds();
@@ -728,6 +728,19 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
     updatePCLViewer();
 }
 
+void start_mesh_viewer() {
+    ROS_INFO_STREAM("Starting the mesh_viewer");
+    mesh_view = (new pcl::visualization::PCLVisualizer("3D mesh viewer"));
+    meshViewer->setBackgroundColor(0, 0, 0);
+    meshViewer->initCameraParameters();
+    // meshViewer->addCoordinateSystem(1.0);
+    meshViewer->setCameraPosition(0, 0, 0, 0, 0, 1, 0, -1, 0);
+    vtkSmartPointer<vtkRenderWindow> renderWindow_mesh =
+        meshViewer->getRenderWindow();
+    renderWindow_mesh->SetSize(640, 480);
+    renderWindow_mesh->Render();
+}
+
 void dynamic_recongifure_callback(
     plane_segmentation::PlaneSegmentationParamsConfig& config,
     uint32_t level) {
@@ -762,6 +775,9 @@ void dynamic_recongifure_callback(
 
     // Indicate new params need to be read
     should_update_params = true;
+
+    // Show viewer if needed
+    if (mesh_view_new && !mesh_view) start_mesh_viewer();
 
     ROS_DEBUG_STREAM("Reconfigure Request:" <<
                      segment_objects_new << " " <<
@@ -810,11 +826,14 @@ int main(int argc, char** argv) {
     f = boost::bind(&dynamic_recongifure_callback, _1, _2);
     server.setCallback(f);
 
-    ros::param::param<std::string>("world_frame", world_frame, "base_link");
+    nh.param<std::string>("world_frame", world_frame, "base_link");
+    nh.param<bool>("subscribe_to_filtered", subscribe_to_filtered, false);
 
     // Possible pointclouds: "/kinect2/hd/points" //xtion: "/camera/depth_registered/points"
     // Pro tip: Use qhd or hd topic, as the sd pointcloud has an offset in y direction.
-    pointcloud_sub = nh.subscribe("/kinect2/qhd/points", 1, new_cloud_callback);
+    pointcloud_sub = (subscribe_to_filtered) ?
+                     nh.subscribe("/kinect2/qhd/points/filtered", 1, new_cloud_callback) :
+                     nh.subscribe("/kinect2/qhd/points", 1, new_cloud_callback);
     //pointcloud_sub = nh.subscribe("/camera/depth_registered/points", 1, new_cloud_callback);
 
     // Send message to get the head to rotate to the table
@@ -839,15 +858,7 @@ int main(int argc, char** argv) {
     renderWindow->SetSize(640, 480);
     renderWindow->Render();
 
-    ROS_WARN_STREAM("Starting the mesh_viwedrsad");
-    meshViewer->setBackgroundColor(0, 0, 0);
-    meshViewer->initCameraParameters();
-    // meshViewer->addCoordinateSystem(1.0);
-    meshViewer->setCameraPosition(0, 0, 0, 0, 0, 1, 0, -1, 0);
-    vtkSmartPointer<vtkRenderWindow> renderWindow_mesh =
-        meshViewer->getRenderWindow();
-    renderWindow_mesh->SetSize(640, 480);
-    renderWindow_mesh->Render();
+    if (mesh_view) start_mesh_viewer();
 
     ROS_WARN_STREAM("Starting spin");
     ros::Rate r(30);
@@ -869,5 +880,8 @@ int main(int argc, char** argv) {
             meshViewer->spinOnce(100);
         r.sleep();
     }
+
+    delete tfBuffer;
+    delete tfListener;
     return 0;
 }

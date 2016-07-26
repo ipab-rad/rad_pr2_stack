@@ -91,7 +91,7 @@ bool Head::lookAt(std::string frame_id, double x, double y, double z) {
   point.point.x = x; point.point.y = y; point.point.z = z;
   goal.target = point;
 
-  goal.pointing_frame = "high_def_frame";
+  goal.pointing_frame = "head_plate_frame"; //"high_def_frame";
   goal.pointing_axis.x = 1;  // pointing_axis defaults to X-axis
   goal.pointing_axis.y = 0;
   goal.pointing_axis.z = 0;
