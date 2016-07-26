@@ -15,7 +15,7 @@ int main(int argc, char** argv) {
   ros::NodeHandle nh("~");
 
   Head head(nh);
-  ros::Rate r(5);
+  ros::Rate r(10);
 
   head.ready();
   head.shake(2);

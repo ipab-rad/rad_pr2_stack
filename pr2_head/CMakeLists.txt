@@ -10,6 +10,7 @@ find_package(catkin REQUIRED COMPONENTS
   actionlib
   sound_play
   pr2_controllers_msgs
+  std_srvs
   message_generation
 )
 

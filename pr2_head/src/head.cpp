@@ -2,6 +2,7 @@
  * @file      head.cpp
  * @brief     Provides basic looking at object frame functionality
  * @author    Alejandro Bordallo <alex.bordallo@ed.ac.uk>
+ * @modified  Daniel Angelov <d.angelov@ed.ac.uk>
  * @date      2016-02-06
  * @copyright (MIT) 2015 RAD-UoE Informatics
  */
@@ -19,12 +20,12 @@ Head::Head(ros::NodeHandle& nh) :
 
   ROS_INFO("Waiting for point head action server...");
   ROS_WARN("Head will not move if joystick node is up! Please stop it now.");
-  if (!point_head_client_->waitForServer(ros::Duration(2.0))) {
+  if (!point_head_client_->waitForServer(ros::Duration(max_waiting_time_))) {
     ROS_WARN("Couldn't reach the head trajectory controller. Head will not move.");
   }
 
   ROS_INFO("Waiting for sound play action server...");
-  if (!speak_client_->waitForServer(ros::Duration(2.0))) {
+  if (!speak_client_->waitForServer(ros::Duration(max_waiting_time_))) {
     ROS_WARN("Couldn't reach the speaker client. No audio will be played.");
   }
   ROS_INFO("PR2 Head initialised.");
@@ -37,10 +38,12 @@ Head::~Head() {
 }
 
 void Head::loadParams() {
-  nh_.getParam("follow_object", follow_object_);
-  nh_.getParam("table_pos/x", table_pos_.x);
-  nh_.getParam("table_pos/y", table_pos_.y);
-  nh_.getParam("table_pos/z", table_pos_.z);
+  nh_.param<bool>("follow_object", follow_object_, true);
+  nh_.param<double>("table_pos/x", table_pos_.x, 0.0);
+  nh_.param<double>("table_pos/y", table_pos_.y, 0.0);
+  nh_.param<double>("table_pos/z", table_pos_.z, 0.0);
+  nh_.param<bool>("vocally_declare_object", vocally_declare_object_, false);
+  nh_.param<double>("max_waiting_time", max_waiting_time_, 2.0);
 }
 
 void Head::init() {
@@ -51,12 +54,14 @@ void Head::init() {
 void Head::rosSetup() {
   target_object_sub_ = nh_.subscribe("target_object", 1, &Head::objCB, this);
   talk_srv_ = nh_.advertiseService("say", &Head::say, this);
+  shake_srv_ = nh_.advertiseService("shake", &Head::shakeCB, this);
+  nod_srv_ = nh_.advertiseService("nod", &Head::nodCB, this);
 }
 
 void Head::objCB(const std_msgs::String::Ptr msg) {
-  ROS_INFO_STREAM("TargObj: " << target_object_);
+  ROS_INFO_STREAM("Last target object: " << target_object_);
   target_object_ = msg->data;
-  ROS_INFO_STREAM("TargObj: " << target_object_);
+  ROS_INFO_STREAM("New target object : " << target_object_);
 }
 
 void Head::ready() {
@@ -69,16 +74,16 @@ void Head::updateLookingPosition() {
   if (target_object_ != "") {
     if ((new_obj) || (follow_object_ == true) ) {
       look_at_object_ = target_object_;
-      if (new_obj) {
-        // std::string sentence = "Looking at " + look_at_object_;
-        // this->speak(sentence);
+      if (new_obj && vocally_declare_object_) {
+        std::string sentence = "Looking at " + look_at_object_;
+        this->speak(sentence);
       }
       this->lookAt(look_at_object_, 0.0, 0.0, 0.0);
     }
   }
 }
 
-void Head::lookAt(std::string frame_id, double x, double y, double z) {
+bool Head::lookAt(std::string frame_id, double x, double y, double z) {
   pr2_controllers_msgs::PointHeadGoal goal;
 
   geometry_msgs::PointStamped point;
@@ -87,8 +92,7 @@ void Head::lookAt(std::string frame_id, double x, double y, double z) {
   goal.target = point;
 
   goal.pointing_frame = "high_def_frame";
-  // goal.pointing_frame = "head_mount_kinect2_rgb_link";
-  goal.pointing_axis.x = 1;  // (pointing_axis defaults to X-axis)
+  goal.pointing_axis.x = 1;  // pointing_axis defaults to X-axis
   goal.pointing_axis.y = 0;
   goal.pointing_axis.z = 0;
 
@@ -96,7 +100,7 @@ void Head::lookAt(std::string frame_id, double x, double y, double z) {
   goal.max_velocity = 0.5;  //  rad/sec
 
   point_head_client_->sendGoal(goal);
-  point_head_client_->waitForResult(ros::Duration(2));
+  return point_head_client_->waitForResult(ros::Duration(max_waiting_time_));
 }
 
 void Head::speak(std::string sentence) {
@@ -124,4 +128,26 @@ void Head::shake(uint n) {
     this->lookAt("base_link", 5.0, 1.0, 1.2);
     this->lookAt("base_link", 5.0, -1.0, 1.2);
   }
+  updateLookingPosition();
+}
+
+void Head::nod(uint n) {
+  uint count = 0;
+  while (ros::ok() && ++count <= n ) {
+    this->lookAt("base_link", 5.0, 0.0, -1.0);
+    this->lookAt("base_link", 5.0, 0.0, 2.0);
+  }
+  updateLookingPosition();
+}
+
+bool Head::shakeCB(std_srvs::Empty::Request& req,
+                   std_srvs::Empty::Response& res) {
+  shake(2);
+  return true;
+}
+
+bool Head::nodCB(std_srvs::Empty::Request& req,
+                 std_srvs::Empty::Response& res) {
+  nod(2);
+  return true;
 }
