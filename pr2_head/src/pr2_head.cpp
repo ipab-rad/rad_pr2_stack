@@ -18,7 +18,6 @@ int main(int argc, char** argv) {
   ros::Rate r(10);
 
   head.ready();
-  head.shake(2);
   while (ros::ok()) {
     ros::spinOnce();
     head.updateLookingPosition();

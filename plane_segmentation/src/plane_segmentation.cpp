@@ -18,6 +18,7 @@
 #include <sensor_msgs/PointCloud2.h>
 #include <geometry_msgs/TransformStamped.h>
 #include <std_srvs/Empty.h>
+#include <std_msgs/String.h>
 
 #include <dynamic_reconfigure/server.h>
 #include <plane_segmentation/PlaneSegmentationParamsConfig.h>
@@ -134,6 +135,7 @@ ros::Publisher plane_pub;
 ros::Publisher outlier_pub;
 ros::Publisher segmented_pub;
 ros::Publisher cluster_pub;
+ros::Publisher table_head_track_pub;
 ros::Subscriber pointcloud_sub;
 pcl::PointCloud<pcl::PointXYZRGB>::Ptr cloud_p(
     new pcl::PointCloud<pcl::PointXYZRGB>),
@@ -787,6 +789,14 @@ bool request_pointcloud_callback(
     return true;
 }
 
+void point2tabletop(ros::NodeHandle& nh) {
+    table_head_track_pub  =
+        nh.advertise<std_msgs::String>("/pr2_head/target_object", 5, true);
+    std_msgs::StringPtr str(new std_msgs::String);
+    str->data = "tabletop";
+    table_head_track_pub.publish(str);
+}
+
 int main(int argc, char** argv) {
     ros::init(argc, argv, "plane_segmentation");
     ros::NodeHandle nh("~");
@@ -806,6 +816,9 @@ int main(int argc, char** argv) {
     // Pro tip: Use qhd or hd topic, as the sd pointcloud has an offset in y direction.
     pointcloud_sub = nh.subscribe("/kinect2/qhd/points", 1, new_cloud_callback);
     //pointcloud_sub = nh.subscribe("/camera/depth_registered/points", 1, new_cloud_callback);
+
+    // Send message to get the head to rotate to the table
+    point2tabletop(nh);
 
     // Create a ROS publisher for the output point cloud
     plane_pub = nh.advertise<sensor_msgs::PointCloud2>("extracted_planes", 1);
