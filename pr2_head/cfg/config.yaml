@@ -1,0 +1,4 @@
+table_pos: {x: 0.5, y: 0.0, z: 0.75}
+follow_object: true
+max_waiting_time: 2.0
+vocally_declare_object: false
