@@ -691,7 +691,15 @@ bool PickPlaceAction::Plan(moveit::core::RobotState start,
 
   move_group_arm.setStartState(start);
   move_group_arm.setJointValueTarget(end);
-  bool success = move_group_arm.plan(plan);
+  moveit_msgs::MoveItErrorCodes moveitError = move_group_arm.plan(plan);
+  ROS_INFO_STREAM("[MoveItPlanning] Error code for planning :" <<
+                  int(moveitError.val));
+  bool success = moveit::planning_interface::MoveItErrorCode(moveitError);
+  if (success) {
+    ROS_WARN_STREAM("Failed to plan. Error code: " << moveitError.val <<
+                    " For success is: " << moveit_msgs::MoveItErrorCodes::SUCCESS <<
+                    " Lookup http://docs.ros.org/indigo/api/moveit_msgs/html/msg/MoveItErrorCodes.html");
+  }
 
   if (orient_constraint.x != 0.0f && orient_constraint.y != 0.0f &&
       orient_constraint.z != 0.0f && orient_constraint.w != 0.0f) {
