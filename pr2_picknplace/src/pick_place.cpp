@@ -60,6 +60,7 @@ PickPlaceAction::PickPlaceAction(ros::NodeHandle& nh, std::string name,
 
   ROS_INFO("[PICKPLACEACTION] Starting PickPlace action server.");
   as_.start();
+  ROS_INFO("[PICKPLACEACTION] PickPlace action server Ready!");
 }
 
 PickPlaceAction::~PickPlaceAction() {
@@ -222,22 +223,30 @@ void PickPlaceAction::executeCB() {
   ps.pose.position.z += 0.015;  // Temporary fix until better transformation
 
   switch (pick_place_goal_.request) {
-    case pr2_picknplace_msgs::PicknPlaceGoal::PICK_REQUEST: //picknplace::REQUEST_PICK:
-      success &= PickCube(ps);
-      break;
-    case pr2_picknplace_msgs::PicknPlaceGoal::PLACE_REQUEST:
-      success &= PlaceCube(ps);
-      break;
-    case pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST:
-      success &= MoveTo(ps);
-      break;
-    case pr2_picknplace_msgs::PicknPlaceGoal::PUSH_REQUEST:
-      ROS_WARN("PUSH Request experimental yet.");
-      success &= Push(ps);
-      break;
-    default:
-      ROS_ERROR("Wrong request id.");
-      success = false;
+  case pr2_picknplace_msgs::PicknPlaceGoal::PICK_REQUEST: //picknplace::REQUEST_PICK:
+    success &= Pick(ps);
+    break;
+  case pr2_picknplace_msgs::PicknPlaceGoal::PLACE_REQUEST:
+    success &= Place(ps);
+    break;
+  case pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST:
+    success &= MoveTo(ps);
+    break;
+  case pr2_picknplace_msgs::PicknPlaceGoal::PUSH_REQUEST:
+    ROS_WARN("PUSH Request experimental yet.");
+    success &= Push(ps);
+    break;
+  case pr2_picknplace_msgs::PicknPlaceGoal::HOLD_REQUEST:
+    ROS_WARN("HOLD Request experimental yet.");
+    success &= Hold(ps);
+    break;
+  case pr2_picknplace_msgs::PicknPlaceGoal::RELEASE_REQUEST:
+    ROS_WARN("RELEASE Request experimental yet.");
+    success &= Release(ps);
+    break;
+  default:
+    ROS_ERROR("Wrong request id.");
+    success = false;
   }
 
   result_.success = success;
@@ -370,7 +379,7 @@ bool PickPlaceAction::ConvertPoseToGrabPose(
   return true;
 }
 
-bool PickPlaceAction::PickCube(geometry_msgs::PoseStamped ps) {
+bool PickPlaceAction::Pick(geometry_msgs::PoseStamped ps) {
   ROS_INFO_STREAM("[PICKPLACEACTION] Starting Pick planning ...");
   moveit::planning_interface::MoveGroup::Plan pregrasp_plan;
   moveit::planning_interface::MoveGroup::Plan grasp_plan;
@@ -378,7 +387,7 @@ bool PickPlaceAction::PickCube(geometry_msgs::PoseStamped ps) {
 
   geometry_msgs::Pose p;
   if (!ConvertPoseToGrabPose(ps, p)) {
-    ROS_WARN("[PickCube] Cannot convert pose!");
+    ROS_WARN("[Pick] Cannot convert pose!");
     return false;
   }
 
@@ -456,7 +465,7 @@ bool PickPlaceAction::PickCube(geometry_msgs::PoseStamped ps) {
   return success;
 }
 
-bool PickPlaceAction::PlaceCube(geometry_msgs::PoseStamped ps) {
+bool PickPlaceAction::Place(geometry_msgs::PoseStamped ps) {
   ROS_INFO_STREAM("[PICKPLACEACTION] Starting Place planning ...");
   moveit::planning_interface::MoveGroup::Plan preplace_plan;
   moveit::planning_interface::MoveGroup::Plan place_plan;
@@ -464,7 +473,7 @@ bool PickPlaceAction::PlaceCube(geometry_msgs::PoseStamped ps) {
 
   geometry_msgs::Pose p;
   if (!ConvertPoseToGrabPose(ps, p)) {
-    ROS_WARN("[PlaceCube] Cannot convert pose!");
+    ROS_WARN("[Place] Cannot convert pose!");
     return false;
   }
 
@@ -473,7 +482,7 @@ bool PickPlaceAction::PlaceCube(geometry_msgs::PoseStamped ps) {
   geometry_msgs::Pose preplace_pose;
 
   if (!ConvertPoseToGrabPose(ps_offset, preplace_pose)) {
-    ROS_WARN("[PlaceCube] Cannot convert pose!");
+    ROS_WARN("[Place] Cannot convert pose!");
     return false;
   }
   geometry_msgs::Pose postplace_pose(preplace_pose);
@@ -664,6 +673,136 @@ bool PickPlaceAction::Push(geometry_msgs::PoseStamped ps) {
                     << ((success) ? "success" : "fail"));
   } else {
     ROS_INFO_STREAM("[PUSHACTION] Failed to find a plan for pose: "
+                    << pick_place_goal_.object_pose);
+  }
+
+  return success;
+}
+
+bool PickPlaceAction::Hold(geometry_msgs::PoseStamped ps) {
+  ROS_INFO_STREAM("[PICKPLACEACTION] Starting Hold planning ...");
+  moveit::planning_interface::MoveGroup::Plan prehold_plan;
+  moveit::planning_interface::MoveGroup::Plan hold_plan;
+
+  geometry_msgs::Pose p;
+  if (!ConvertPoseToGrabPose(ps, p)) {
+    ROS_WARN("[Hold] Cannot convert pose!");
+    return false;
+  }
+
+  geometry_msgs::Pose pregrasp_pose(p);
+  pregrasp_pose.position.z += 0.1;
+
+  ROS_DEBUG_STREAM("Pregrasp " << pregrasp_pose);
+  ROS_DEBUG_STREAM("Grasp " << p);
+
+  moveit::core::RobotState pregrasp_robot_state = CreateEmptyRobotState();
+  moveit::core::RobotState grasp_robot_state = CreateEmptyRobotState();
+  bool success = RobotStateFromPose(pregrasp_pose, pregrasp_robot_state);
+  success &= RobotStateFromPose(p, grasp_robot_state);
+
+  if (!success) {
+    ROS_WARN_STREAM("Cannot get robot pose for some of the needed poses.");
+  } else {
+    success &= Plan(*move_group_arm.getCurrentState(),
+                    pregrasp_robot_state,
+                    prehold_plan);
+    ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'pregrasp': " <<
+                    ((success) ? "success" : "fail"));
+    success &= Plan(pregrasp_robot_state, grasp_robot_state,
+                    hold_plan);
+    ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'grasp': " <<
+                    ((success) ? "success" : "fail"));
+  }
+
+  if (success) {
+    ROS_INFO_STREAM("[PICKPLACEACTION] Executing on the robot ...");
+    if (use_touch_pads) {
+      success &= SensorRelease();
+    } else {
+      SendGripperCommand(open_gripper_pos_);
+    }
+
+    success = move_group_arm.execute(prehold_plan);
+    ros::WallDuration(exec_wait_).sleep();
+
+    if (success) { success &= CheckGripperFinished();}
+
+    if (success) { success &= move_group_arm.execute(hold_plan); }
+    ros::WallDuration(exec_wait_).sleep();
+
+    if (use_touch_pads) {
+      success &= SensorGrab();
+    } else {
+      SendGripperCommand(close_gripper_pos_, close_effort_);
+    }
+
+    if (success) { success &= CheckGripperFinished(); }
+
+    ros::WallDuration(0.1).sleep();  // Gripper delay for better grippage
+
+    if (is_gripper_empty) ROS_WARN("gripper empty");
+    if (success) { success &= !is_gripper_empty; }
+
+    ROS_INFO_STREAM("[PICKPLACEACTION] MoveIt execution of hold plan: "
+                    << ((success) ? "success" : "fail"));
+  } else {
+    ROS_INFO_STREAM("[PICKPLACEACTION] Failed to find a plan for pose: "
+                    << pick_place_goal_.object_pose);
+  }
+  return success;
+}
+
+bool PickPlaceAction::Release(geometry_msgs::PoseStamped ps) {
+  ROS_INFO_STREAM("[PICKPLACEACTION] Starting Release planning ...");
+  moveit::planning_interface::MoveGroup::Plan postrelease_plan;
+
+  geometry_msgs::Pose p;
+  if (!ConvertPoseToGrabPose(ps, p)) {
+    ROS_WARN("[Release] Cannot convert pose!");
+    return false;
+  }
+
+  geometry_msgs::PoseStamped ps_offset(ps);
+  ps_offset.pose.position.z += 0.1;
+  geometry_msgs::Pose postrelease_pose;
+
+  if (!ConvertPoseToGrabPose(ps_offset, postrelease_pose)) {
+    ROS_WARN("[Release] Cannot convert pose!");
+    return false;
+  }
+
+  ROS_DEBUG_STREAM("Release " << p);
+  ROS_DEBUG_STREAM("Postrelease " << postrelease_pose);
+
+  moveit::core::RobotState postrelease_robot_state = CreateEmptyRobotState();
+  bool success = RobotStateFromPose(postrelease_pose, postrelease_robot_state);
+
+  if (!success) {
+    ROS_WARN_STREAM("Cannot get robot pose for some of the needed poses.");
+  } else {
+    success &= Plan(*move_group_arm.getCurrentState(), postrelease_robot_state,
+                    postrelease_plan);
+  }
+  ROS_INFO_STREAM("[PICKPLACEACTION] Planning 'postrelease': " <<
+                  ((success) ? "success" : "fail"));
+
+  if (success) {
+    ROS_INFO_STREAM("[PICKPLACEACTION] Executing on the robot ...");
+
+    if (use_touch_pads) {
+      success &= SensorRelease();
+    } else {
+      SendGripperCommand(open_gripper_pos_);
+    }
+
+    if (success) { success &= CheckGripperFinished(); }
+
+    success &= move_group_arm.execute(postrelease_plan);
+    ROS_INFO_STREAM("[PICKPLACEACTION] MoveIt execution of release plan: "
+                    << ((success) ? "success" : "fail"));
+  } else {
+    ROS_INFO_STREAM("[PICKPLACEACTION] Failed to find a plan for pose: "
                     << pick_place_goal_.object_pose);
   }
 

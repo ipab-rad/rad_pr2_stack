@@ -1,23 +1,14 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(pr2_picknplace)
+project(pr2_tower_msgs)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  pr2_picknplace_msgs
   actionlib
-  tf2_ros
-  tf2_geometry_msgs
-  tf2_eigen
   geometry_msgs
-  move_base_msgs
-  moveit_msgs
   std_msgs
-  moveit_core
-  moveit_ros_planning
-  moveit_ros_planning_interface
+  message_generation
 )
 
 ## System dependencies are found with CMake's conventions
@@ -68,17 +59,18 @@ find_package(catkin REQUIRED COMPONENTS
 # )
 
 ## Generate actions in the 'action' folder
-# add_action_files(
-#   FILES
-#   Action1.action
-#   Action2.action
-# )
+add_action_files(
+  FILES
+  TowerSM.action
+)
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   move_base_msgs#   moveit_msgs#   std_msgs
-# )
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+  geometry_msgs
+  actionlib_msgs
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -110,80 +102,47 @@ find_package(catkin REQUIRED COMPONENTS
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
- INCLUDE_DIRS include
-#  LIBRARIES pr2_picknplace
- CATKIN_DEPENDS pr2_picknplace_msgs actionlib move_base_msgs moveit_msgs std_msgs
+#  INCLUDE_DIRS include
+#  LIBRARIES pr2_tower_msgs
+#  CATKIN_DEPENDS std_msgs
 #  DEPENDS system_lib
-  moveit_core
-  moveit_ros_planning_interface
 )
 
 ###########
 ## Build ##
 ###########
-# find_package(Clang++3.6)
-# if(CLANG_FOUND)
-# message (STATUS "CLang found!")
-# else(CLANG_FOUND)
-# message (STATUS "CLang not found")
-# endif()
-
-find_package(Eigen3 REQUIRED)
-
 set(CMAKE_CXX_COMPILER "/usr/bin/clang++-3.6")
 set(CMAKE_C_COMPILER "/usr/bin/clang-3.6")
-set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wno-deprecated-register -O2")
+set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -O2")
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 # include_directories(include)
 include_directories(
-  include
   ${catkin_INCLUDE_DIRS}
-  ${EIGEN3_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
-# add_library(pr2_picknplace
-#   src/${PROJECT_NAME}/pr2_picknplace.cpp
+# add_library(pr2_tower_msgs
+#   src/${PROJECT_NAME}/pr2_tower_msgs.cpp
 # )
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
-# add_dependencies(pr2_picknplace ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+# add_dependencies(pr2_tower_msgs ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
-add_executable(pr2_picknplace
-  src/pr2_picknplace.cpp
-  src/pick_place.cpp)
-
-add_executable(pr2_picknplace_actest
-  src/pick_place_actest.cpp)
-
-add_executable(pr2_localise_table
-  src/pr2_localise_table.cpp)
+# add_executable(pr2_tower_msgs_node src/pr2_tower_msgs_node.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
-add_dependencies(pr2_picknplace
-  pr2_picknplace_msgs_gencpp)
-
-add_dependencies(pr2_picknplace_actest
-  pr2_picknplace_msgs_gencpp)
+# add_dependencies(pr2_tower_msgs_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(pr2_picknplace
-  ${catkin_LIBRARIES}
-)
-
-target_link_libraries(pr2_picknplace_actest
-  ${catkin_LIBRARIES}
-)
-
-target_link_libraries(pr2_localise_table
-  ${catkin_LIBRARIES}
-)
+# target_link_libraries(pr2_tower_msgs_node
+#   ${catkin_LIBRARIES}
+# )
 
 #############
 ## Install ##
@@ -200,7 +159,7 @@ target_link_libraries(pr2_localise_table
 # )
 
 ## Mark executables and/or libraries for installation
-# install(TARGETS pr2_picknplace pr2_picknplace_node
+# install(TARGETS pr2_tower_msgs pr2_tower_msgs_node
 #   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -225,7 +184,7 @@ target_link_libraries(pr2_localise_table
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_pr2_picknplace.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_pr2_tower_msgs.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()

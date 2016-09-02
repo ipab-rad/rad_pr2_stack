@@ -1,0 +1,10 @@
+<?xml version="1.0"?>
+
+<launch>
+
+    <rosparam file="$(find pr2_tower)/cfg/pr2_tower_config.yaml" ns="pr2_tower" command="load" />
+
+    <node name="pr2_tower" pkg="pr2_tower" type="pr2_tower" output="screen" clear_params="true">
+    </node>
+
+</launch>

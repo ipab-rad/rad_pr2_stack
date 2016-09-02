@@ -1,0 +1,8 @@
+# Goal
+bool build
+---
+# Result
+bool success
+---
+# Feedback
+string feedback
