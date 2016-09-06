@@ -49,6 +49,9 @@ class TowerSM {
  private:
 	// Methods
 	bool buildTower();
+	bool prepareArms();
+	bool dissassembleTower();
+	bool releaseTower();
 	bool checkOK();
 
 	// Flags
@@ -56,6 +59,7 @@ class TowerSM {
 	// Parameters
 	int num_blocks_;
 	float block_height_;
+	bool dissassemble_;
 	geometry_msgs::Pose tower_pose_;
 
 	// Variables
@@ -63,7 +67,10 @@ class TowerSM {
 	pr2_tower_msgs::TowerSMGoal tower_sm_goal_;
 	pr2_picknplace_msgs::PickPlaceGoal pick_;
 	pr2_picknplace_msgs::PickPlaceGoal place_;
+	pr2_picknplace_msgs::PickPlaceGoal movetoright_;
+	pr2_picknplace_msgs::PickPlaceGoal movetoleft_;
 	pr2_picknplace_msgs::PickPlaceGoal hold_;
+	pr2_picknplace_msgs::PickPlaceGoal release_;
 
 	// ROS
 	actionlib::SimpleActionClient<pr2_picknplace_msgs::PickPlaceAction> ac_right_;
