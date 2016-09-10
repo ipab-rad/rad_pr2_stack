@@ -77,11 +77,11 @@ void PickPlaceAction::loadParams() {
   }
   ros::param::param(ns_ + "/max_planning_time", max_planning_time_, 10.0);
   ros::param::param(ns_ + "/num_planning_attempts", num_planning_attempts_, 1);
-  ros::param::param(ns_ + "/add_table", add_table_, true);
+  ros::param::param(ns_ + "/add_table", add_table_, false);
   ros::param::param(ns_ + "/open_gripper_pos", open_gripper_pos_, 0.08);
   ros::param::param(ns_ + "/close_gripper_pos", close_gripper_pos_, 0.00);
   ros::param::param(ns_ + "/close_effort", close_effort_, 50.0);
-  ros::param::param(ns_ + "/use_touch_pads", use_touch_pads, true);
+  ros::param::param(ns_ + "/use_touch_pads", use_touch_pads, false);
 
   if (use_touch_pads) {
     ros::param::param(ns_ + "/hardness_gain", hardness_gain, 0.03);
@@ -352,7 +352,7 @@ bool PickPlaceAction::ConvertPoseToGrabPose(
 
     Eigen::Affine3d t = t1 * t0 * t2 * t0.inverse();
 
-    ROS_INFO_STREAM("T3:\n" << t3.matrix());
+    // ROS_INFO_STREAM("T3:\n" << t3.matrix());
 
     transform.transform.translation.x = t.translation().x();
     transform.transform.translation.y = t.translation().y();
@@ -868,6 +868,7 @@ void PickPlaceAction::SendGripperCommand(float position, float max_effort) {
   cm.command.max_effort = max_effort;
   ROS_INFO("Sending standard gripper command");
   gripper_client_->sendGoal(cm);
+  ros::Duration(3.0).sleep();
 }
 
 bool PickPlaceAction::CheckGripperFinished() {
@@ -907,6 +908,7 @@ bool PickPlaceAction::CheckGripperFinished() {
     }
   } else {
     // Use standard gripper
+    ros::Duration(3.0).sleep();
     gripper_client_->waitForResult(ros::Duration(max_planning_time_));
     if (gripper_client_->getState() ==
         actionlib::SimpleClientGoalState::SUCCEEDED) {

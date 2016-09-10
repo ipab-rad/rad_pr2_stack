@@ -57,6 +57,8 @@ class TowerSM {
 	// Flags
 
 	// Parameters
+	float ac_timeout_;
+	bool hold_tower_;
 	int num_blocks_;
 	float block_height_;
 	bool dissassemble_;

@@ -1,7 +1,8 @@
 num_blocks: 5
 block_height: 0.035
-dissassemble: true # Whether tower should be dissassembled after
-preallocation: true # Whether positions of blocks are provided
+calibrate: false      # Blocks will be placed
+dissassemble: false    # Whether tower should be dissassembled after
+preallocation: true   # Whether positions of blocks are provided
 tower: {
   position: {x: 0.1, y: -0.03, z: 0.019},
   # orientation: {x: 0.707, y: 0, z: 0, w: 0.707}

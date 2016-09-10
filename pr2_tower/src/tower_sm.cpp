@@ -79,6 +79,8 @@ void TowerSM::loadParams() {
 }
 
 void TowerSM::init() {
+  ac_timeout_ = 120.0;
+  hold_tower_ = false;
   pick_.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::PICK_REQUEST;
   pick_.goal.header.frame_id = "tabletop";
 
@@ -154,10 +156,10 @@ bool TowerSM::prepareArms() {
     ROS_INFO("Preparing...");
     ac_right_.sendGoal(movetoright_);
     ac_left_.sendGoal(movetoleft_);
-    ac_right_.waitForResult(ros::Duration(10.0));
+    ac_right_.waitForResult(ros::Duration(ac_timeout_));
     if (ac_right_.getState() != actionlib::SimpleClientGoalState::SUCCEEDED)
     {result_.success = false;}
-    ac_left_.waitForResult(ros::Duration(10.0));
+    ac_left_.waitForResult(ros::Duration(ac_timeout_));
     if (ac_left_.getState() != actionlib::SimpleClientGoalState::SUCCEEDED)
     {result_.success = false;}
   }
@@ -168,17 +170,19 @@ bool TowerSM::buildTower() {
   ROS_INFO("Building!");
   for (int i = 0; i < num_blocks_; ++i) {
     // Pick Block up
+    ROS_INFO_STREAM("Pick Block " << i);
     if (!checkOK()) {break;}
     pick_.goal.object_pose = block_poses_[i];
     pick_.goal.object_pose.orientation.x = 0.707;
     pick_.goal.object_pose.orientation.w = 0.707;
     ac_right_.sendGoal(pick_);
     ROS_DEBUG_STREAM("PickHeight: " << pick_.goal.object_pose.position.z);
-    ac_right_.waitForResult(ros::Duration(10.0));
+    ac_right_.waitForResult(ros::Duration(ac_timeout_));
     if (ac_right_.getState() != actionlib::SimpleClientGoalState::SUCCEEDED)
     {result_.success = false; break;}
 
     // Place Block down
+    ROS_INFO_STREAM("Place Block " << i);
     if (!checkOK()) {break;}
     place_.goal.object_pose = tower_pose_;
     place_.goal.object_pose.position.z =
@@ -188,19 +192,19 @@ bool TowerSM::buildTower() {
       place_.goal.object_pose.orientation.w = 0.707;
     }
     ac_right_.sendGoal(place_);
-    ac_right_.waitForResult(ros::Duration(10.0));
+    ac_right_.waitForResult(ros::Duration(ac_timeout_));
     if (ac_right_.getState() != actionlib::SimpleClientGoalState::SUCCEEDED)
     {result_.success = false; break;}
 
     // Hold first block with left hand
-    if (i == 0) {
+    if (i == 0 && hold_tower_) {
       ac_left_.sendGoal(hold_);
-      ac_left_.waitForResult(ros::Duration(10.0));
+      ac_left_.waitForResult(ros::Duration(ac_timeout_));
       if (ac_left_.getState() != actionlib::SimpleClientGoalState::SUCCEEDED)
       {result_.success = false; break;}
     }
   }
-  releaseTower(); //  Let go of tower when completed
+  if (hold_tower_) {releaseTower();} //  Let go of tower when completed
 
   return result_.success;
 }
@@ -212,18 +216,18 @@ bool TowerSM::dissassembleTower() {
     // Hold lower block for dissassembly
     release_.goal.object_pose.position.z = block_height_ * i;
     ac_left_.sendGoal(release_);
-    ac_left_.waitForResult(ros::Duration(10.0));
+    ac_left_.waitForResult(ros::Duration(ac_timeout_));
     if (ac_left_.getState() != actionlib::SimpleClientGoalState::SUCCEEDED)
     {result_.success = false; break;}
     if (i > 0) {
       hold_.goal.object_pose.position.z = block_height_ * (i - 1);
       ac_left_.sendGoal(hold_);
-      ac_left_.waitForResult(ros::Duration(10.0));
+      ac_left_.waitForResult(ros::Duration(ac_timeout_));
       if (ac_left_.getState() != actionlib::SimpleClientGoalState::SUCCEEDED)
       {result_.success = false; break;}
     } else {  // Except the very last block
       ac_left_.sendGoal(movetoleft_);
-      ac_left_.waitForResult(ros::Duration(10.0));
+      ac_left_.waitForResult(ros::Duration(ac_timeout_));
       if (ac_left_.getState() != actionlib::SimpleClientGoalState::SUCCEEDED)
       {result_.success = false; break;}
     }
@@ -236,7 +240,7 @@ bool TowerSM::dissassembleTower() {
     pick_.goal.object_pose.orientation.w = 0.707;
     ac_right_.sendGoal(pick_);
     ROS_DEBUG_STREAM("PickHeight: " << pick_.goal.object_pose.position.z);
-    ac_right_.waitForResult(ros::Duration(10.0));
+    ac_right_.waitForResult(ros::Duration(ac_timeout_));
     if (ac_right_.getState() != actionlib::SimpleClientGoalState::SUCCEEDED)
     {result_.success = false; break;}
 
@@ -247,7 +251,7 @@ bool TowerSM::dissassembleTower() {
     place_.goal.object_pose.orientation.x = 0.707;
     place_.goal.object_pose.orientation.w = 0.707;
     ac_right_.sendGoal(place_);
-    ac_right_.waitForResult(ros::Duration(10.0));
+    ac_right_.waitForResult(ros::Duration(ac_timeout_));
     if (ac_right_.getState() != actionlib::SimpleClientGoalState::SUCCEEDED)
     {result_.success = false; break;}
   }
@@ -257,7 +261,7 @@ bool TowerSM::dissassembleTower() {
 
 bool TowerSM::releaseTower() {
   ac_left_.sendGoal(release_);
-  ac_left_.waitForResult(ros::Duration(10.0));
+  ac_left_.waitForResult(ros::Duration(ac_timeout_));
   if (ac_left_.getState() != actionlib::SimpleClientGoalState::SUCCEEDED)
   {result_.success = false;}
 
