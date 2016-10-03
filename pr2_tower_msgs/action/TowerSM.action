@@ -1,5 +1,7 @@
 # Goal
+bool calibrate
 bool build
+bool dissassemble
 ---
 # Result
 bool success

@@ -1,35 +1,28 @@
 num_blocks: 5
 block_height: 0.035
-calibrate: false      # Blocks will be placed
-dissassemble: false    # Whether tower should be dissassembled after
 preallocation: true   # Whether positions of blocks are provided
+hold_tower: true      # Hold Tower with left hand while being built
 tower: {
-  position: {x: 0.1, y: -0.03, z: 0.019},
-  # orientation: {x: 0.707, y: 0, z: 0, w: 0.707}
+  position: {x: 0.1, y: 0.0, z: 0.019},
   orientation: {x: 0, y: 0, z: 0, w: 1}
 }
 block_0: {
-  position: {x: 0.1, y: -0.15, z: 0.019},
-  # orientation: {x: 0.707, y: 0, z: 0, w: 0.707}
-  orientation: {x: 0, y: 0, z: 0, w: 1}
+  position: {x: 0.05, y: -0.26, z: 0.019},
+  orientation: {x: 0.358, y: 0, z: 0, w: 0.934}
 }
 block_1: {
-  position: {x: 0.2, y: -0.20, z: 0.019},
-  # orientation: {x: 0.707, y: 0, z: 0, w: 0.707}
-  orientation: {x: 0, y: 0, z: 0, w: 1}
+  position: {x: 0.15, y: -0.11, z: 0.019},
+  orientation: {x: 0.191, y: 0, z: 0, w: 0.982}
 }
 block_2: {
-  position: {x: 0.1, y: -0.25, z: 0.019},
-  # orientation: {x: 0.707, y: 0, z: 0, w: 0.707}
-  orientation: {x: 0, y: 0, z: 0, w: 1}
+  position: {x: 0.22, y: -0.28, z: 0.019},
+  orientation: {x: 0.485, y: 0, z: 0, w: 0.875}
 }
 block_3: {
-  position: {x: 0.2, y: -0.30, z: 0.019},
-  # orientation: {x: 0.707, y: 0, z: 0, w: 0.707}
-  orientation: {x: 0, y: 0, z: 0, w: 1}
+  position: {x: 0.17, y: -0.39, z: 0.019},
+  orientation: {x: 0.609, y: 0, z: 0, w: 0.793}
 }
 block_4: {
-  position: {x: 0.1, y: -0.35, z: 0.019},
-  # orientation: {x: 0.707, y: 0, z: 0, w: 0.707}
-  orientation: {x: 0, y: 0, z: 0, w: 1}
+  position: {x: 0.07, y: -0.51, z: 0.019},
+  orientation: {x: 0.044, y: 0, z: 0, w: 0.999}
 }

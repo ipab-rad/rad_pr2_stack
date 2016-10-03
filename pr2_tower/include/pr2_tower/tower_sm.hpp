@@ -49,7 +49,8 @@ class TowerSM {
  private:
 	// Methods
 	bool buildTower();
-	bool prepareArms();
+	bool moveArmsAway();
+	bool calibrateBlocks();
 	bool dissassembleTower();
 	bool releaseTower();
 	bool checkOK();
@@ -61,7 +62,6 @@ class TowerSM {
 	bool hold_tower_;
 	int num_blocks_;
 	float block_height_;
-	bool dissassemble_;
 	geometry_msgs::Pose tower_pose_;
 
 	// Variables

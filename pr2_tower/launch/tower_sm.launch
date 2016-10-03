@@ -6,5 +6,6 @@
 
     <node name="pr2_tower" pkg="pr2_tower" type="pr2_tower" output="screen" clear_params="true">
     </node>
+    <!-- <include file="$(find pr2_head)/launch/pr2_head.launch"/> -->
 
 </launch>
