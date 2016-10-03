@@ -11,7 +11,13 @@
 
     <rosparam file="$(find pr2_picknplace)/cfg/picknplace_config.yaml" ns="pick_place" command="load" />
 
-    <node name="pr2_picknplace" pkg="pr2_picknplace" type="pr2_picknplace" output="screen" clear_params="true">
+    <node name="pr2_picknplace_right" pkg="pr2_picknplace" type="pr2_picknplace" output="screen" clear_params="true" args="right_arm">
+        <remap from="pr2_picknplace/collision_object" to="/collision_object" />
+        <remap from="pr2_picknplace/attached_collision_object" to="/attached_collision_object" />
+        <param name="use_touch_pads" value="$(arg use_touch_pads)" />
+    </node>
+
+    <node name="pr2_picknplace_left" pkg="pr2_picknplace" type="pr2_picknplace" output="screen" clear_params="true" args="left_arm">
         <remap from="pr2_picknplace/collision_object" to="/collision_object" />
         <remap from="pr2_picknplace/attached_collision_object" to="/attached_collision_object" />
         <param name="use_touch_pads" value="$(arg use_touch_pads)" />
