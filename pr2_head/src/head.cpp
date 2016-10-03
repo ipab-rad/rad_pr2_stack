@@ -39,6 +39,7 @@ Head::~Head() {
 
 void Head::loadParams() {
   nh_.param<bool>("follow_object", follow_object_, true);
+  nh_.param<bool>("look_table", look_table_, false);
   nh_.param<double>("table_pos/x", table_pos_.x, 0.0);
   nh_.param<double>("table_pos/y", table_pos_.y, 0.0);
   nh_.param<double>("table_pos/z", table_pos_.z, 0.0);
@@ -66,7 +67,8 @@ void Head::objCB(const std_msgs::String::Ptr msg) {
 
 void Head::ready() {
   this->speak("PR2 Ready");
-  this->lookAt("base_link", table_pos_.x, table_pos_.y, table_pos_.z);
+  if (look_table_)
+  {this->lookAt("base_link", table_pos_.x, table_pos_.y, table_pos_.z);}
 }
 
 void Head::updateLookingPosition() {

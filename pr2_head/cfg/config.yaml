@@ -1,4 +1,5 @@
 table_pos: {x: 0.5, y: 0.0, z: 0.75}
-follow_object: true
-max_waiting_time: 2.0
+look_table: false             # Look at table after initialisation
+follow_object: true           # Follow object with head motion
+max_waiting_time: 2.0         # Wait for head motion
 vocally_declare_object: false
