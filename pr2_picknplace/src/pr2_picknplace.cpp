@@ -16,13 +16,17 @@ int main(int argc, char** argv) {
   ros::AsyncSpinner spinner(4);
   spinner.start();
 
-  std::string arm;
-  if (!ros::param::get("/pick_place/arm", arm)) {
-    ROS_ERROR("Cannot read parameters!");
-    ros::shutdown();
-  }
+  std::string arm = argv[1];
+  // for (int i = 0; i < argc; i++)
+  // {ROS_INFO_STREAM("argv[" << i << "] = " << argv[i]); }
+  // ROS_INFO_STREAM("NS: " << ros::this_node::getNamespace());
+  // if (!ros::param::get("/pr2_picknplace_right/arm", arm)) {
+  //   ROS_ERROR("Cannot read parameters!");
+  //   ros::shutdown();
+  // }
 
-  PickPlaceAction pick_place(nh, "pick_place", arm);
+
+  PickPlaceAction pick_place(nh, "pr2_picknplace", arm);
   ros::Rate r(10);
 
   while (ros::ok()) {

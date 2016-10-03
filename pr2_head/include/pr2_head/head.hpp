@@ -55,9 +55,10 @@ class Head {
              std_srvs::Empty::Response& res);
 
   // Flags
-  bool follow_object_;
 
   // Parameters
+  bool follow_object_;
+  bool look_table_;
   geometry_msgs::Vector3 table_pos_;
 
   // Variables
