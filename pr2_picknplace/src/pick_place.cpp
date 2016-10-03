@@ -22,7 +22,7 @@ PickPlaceAction::PickPlaceAction(ros::NodeHandle& nh, std::string name,
   as_.registerGoalCallback(boost::bind(&PickPlaceAction::goalCB, this));
   as_.registerPreemptCallback(boost::bind(&PickPlaceAction::preemptCB, this));
 
-  ns_ = ros::this_node::getNamespace() + name;
+  ns_ = ros::this_node::getNamespace() + "_" + name;
 
   if (arm == "right_arm") {
     wrist_roll_link = "r_wrist_roll_link";
@@ -868,7 +868,7 @@ void PickPlaceAction::SendGripperCommand(float position, float max_effort) {
   cm.command.max_effort = max_effort;
   ROS_INFO("Sending standard gripper command");
   gripper_client_->sendGoal(cm);
-  ros::Duration(3.0).sleep();
+  // ros::Duration(3.0).sleep();
 }
 
 bool PickPlaceAction::CheckGripperFinished() {
@@ -908,7 +908,7 @@ bool PickPlaceAction::CheckGripperFinished() {
     }
   } else {
     // Use standard gripper
-    ros::Duration(3.0).sleep();
+    // ros::Duration(3.0).sleep();
     gripper_client_->waitForResult(ros::Duration(max_planning_time_));
     if (gripper_client_->getState() ==
         actionlib::SimpleClientGoalState::SUCCEEDED) {

@@ -26,7 +26,7 @@ int main(int argc, char** argv) {
   // }
 
 
-  PickPlaceAction pick_place(nh, "pick_place", arm);
+  PickPlaceAction pick_place(nh, "pr2_picknplace", arm);
   ros::Rate r(10);
 
   while (ros::ok()) {

@@ -2,16 +2,16 @@
 add_table: false
 max_planning_time: 10.0
 num_planning_attempts: 5
-use_touch_pads: false
+use_touch_pads: true
 
 # Simple gripper (if use_touch_pads = false)
 # open_gripper_pos: 0.06
 ## Values for Real Robot
-# open_gripper_pos: 0.08
-# close_gripper_pos: 0.01
+open_gripper_pos: 0.08
+close_gripper_pos: 0.01
 ## Values for Simulated Robot
-open_gripper_pos: 0.07
-close_gripper_pos: 0.058
+# open_gripper_pos: 0.07
+# close_gripper_pos: 0.058
 close_effort: 100.0
 
 # pr2_gripper_sensor_action params
@@ -20,6 +20,6 @@ fingertip_force_limit: 15.0 # N
 deformation_limit: 0.04 # m
 force_lightest: 3.0 # N
 ## Value for Simulated Robot
-position_open: 0.07 # m
+# position_open: 0.07 # m
 ## Value for Real Robot
-# position_open: 0.08 # m
+position_open: 0.08 # m

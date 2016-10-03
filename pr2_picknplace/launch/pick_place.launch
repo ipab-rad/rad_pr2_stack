@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 
 <launch>
-    <arg name="use_touch_pads" value="false" />
+    <arg name="use_touch_pads" value="true" />
 
     <arg name="user" value="pr2admin" />
     <arg name="env-loader" default="/etc/ros/indigo/env.sh"/>
