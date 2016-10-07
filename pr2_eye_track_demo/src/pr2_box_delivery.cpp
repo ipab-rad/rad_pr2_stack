@@ -31,6 +31,8 @@ void PR2BoxDelivery::loadParams() {
         ROS_WARN("[PR2BoxDelivery] Parameters were not loaded! Using default.");
     }
     ros::param::param(ns_ + "/max_planning_time", max_planning_time_, 10.0);
+    ros::param::param(ns_ + "/max_time_box_unobservable",
+                      max_time_box_unobservable_, 10.0);
 }
 
 void PR2BoxDelivery::init() {
@@ -46,4 +48,11 @@ bool PR2BoxDelivery::pick_up_callback(std_srvs::Empty::Request& request,
                                       std_srvs::Empty::Response& response) {
     ROS_INFO("Picking up box!");
     return true;
+}
+
+
+void PR2BoxDelivery::updatePose(std::string frame,
+                                geometry_msgs::TransformStamped p) {
+    box_poses[frame] = p;
+    ROS_INFO_STREAM("Updated pose for frame: " << frame);
 }

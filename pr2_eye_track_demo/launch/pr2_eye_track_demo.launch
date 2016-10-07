@@ -1,5 +1,5 @@
 <launch>
-    <node name="pr2_eye_track_demo" pkg="pr2_eye_track_demo" type="pr2_eye_track_demo_node" />
+    <node name="pr2_eye_track_demo" pkg="pr2_eye_track_demo" type="pr2_eye_track_demo_node" output="screen"  />
 
 
     <node name="apriltag_detector" pkg="apriltags_ros" type="apriltag_detector_node" output="screen" ns="apriltag_ns">
