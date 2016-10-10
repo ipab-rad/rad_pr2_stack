@@ -7,8 +7,8 @@
         <param name="image_transport" type="str" value="compressed" />
         <param name="sensor_frame_id" value="head_mount_kinect2_rgb_optical_frame"/>
         <rosparam param="tag_descriptions">[
-            {id: 121, size: 0.16, frame_id: kinect2_tag_121},
-            {id: 1, size: 0.14, frame_id: kinect2_tag_1}]
+            {id: 22, size: 0.05, frame_id: kinect2_tag_22},
+            {id: 23, size: 0.05, frame_id: kinect2_tag_23}]
         </rosparam>
     </node>
 </launch>

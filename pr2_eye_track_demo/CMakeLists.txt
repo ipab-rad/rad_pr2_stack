@@ -7,11 +7,13 @@ project(pr2_eye_track_demo)
 find_package(catkin REQUIRED COMPONENTS
   actionlib
   geometry_msgs
-  pr2_gripper_sensor_msgs
   pr2_picknplace_msgs
   roscpp
   std_msgs
   tf2_ros
+  tf2_geometry_msgs
+  tf2_eigen
+  message_generation
 )
 
 ## System dependencies are found with CMake's conventions
@@ -54,12 +56,12 @@ find_package(Eigen3 REQUIRED)
 #   Message2.msg
 # )
 
-## Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   Service1.srv
-#   Service2.srv
-# )
+# Generate services in the 'srv' folder
+add_service_files(
+  FILES
+  BoxQuery.srv
+  # Service2.srv
+)
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -69,10 +71,11 @@ find_package(Eigen3 REQUIRED)
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#   DEPENDENCIES
-#   geometry_msgs#   pr2_gripper_sensor_msgs#   pr2_picknplace_msgs#   std_msgs
-# )
+generate_messages(
+   DEPENDENCIES
+#   geometry_msgs#   pr2_picknplace_msgs#
+  std_msgs
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -142,7 +145,10 @@ add_executable(pr2_eye_track_demo_node src/pr2_box_delivery.cpp src/pr2_eye_trac
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
-# add_dependencies(pr2_eye_track_demo_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+add_dependencies(pr2_eye_track_demo_node
+  ${${PROJECT_NAME}_EXPORTED_TARGETS}
+  ${catkin_EXPORTED_TARGETS}
+  pr2_eye_track_demo_gencpp)
 
 ## Specify libraries to link a library or executable target against
 target_link_libraries(pr2_eye_track_demo_node

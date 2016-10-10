@@ -1,0 +1,6 @@
+int32 box_id
+string box_frame
+string arm
+---
+bool success
+string message
