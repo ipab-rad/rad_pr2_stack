@@ -27,6 +27,7 @@
 
 // Services
 #include <std_srvs/Empty.h>
+#include <std_srvs/Trigger.h>
 #include <pr2_eye_track_demo/BoxQuery.h>
 
 typedef actionlib::SimpleActionClient <pr2_picknplace_msgs::PickPlaceAction>
@@ -48,9 +49,11 @@ class BoxDelivery {
     // ROS
     ros::NodeHandle* nh_;
     ros::ServiceServer pick_up_service;
+    ros::ServiceServer put_down_service;
 
     PickPlaceACPtr pp_left;
     PickPlaceACPtr pp_right;
+    geometry_msgs::Pose last_pickup_loc;
 
     // Variables
     std::string ns_;
@@ -62,6 +65,9 @@ class BoxDelivery {
     // Methods
     bool pick_up_callback(pr2_eye_track_demo::BoxQuery::Request& request,
                           pr2_eye_track_demo::BoxQuery::Response& response);
+    bool put_down_callback(
+        std_srvs::Trigger::Request& request,
+        std_srvs::Trigger::Response& response);
 };
 
 #endif  /* BOX_DELIVERY_HPP */

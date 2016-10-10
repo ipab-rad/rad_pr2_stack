@@ -8,6 +8,7 @@
 
 #include "pr2_eye_track_demo/box_delivery.hpp"
 #include <std_srvs/Empty.h>
+#include <std_srvs/Trigger.h>
 #include <pr2_picknplace_msgs/PicknPlaceGoal.h>
 #include <tf2_eigen/tf2_eigen.h>
 #include <Eigen/Geometry>
@@ -43,6 +44,8 @@ void BoxDelivery::init() {
 void BoxDelivery::rosSetup() {
     pick_up_service =
         nh_->advertiseService("pick_up_box", &BoxDelivery::pick_up_callback, this);
+    put_down_service =
+        nh_->advertiseService("put_down_box", &BoxDelivery::put_down_callback, this);
 
     double wait_time = 10;
     pp_left = PickPlaceACPtr(new PickPlaceAC("/pr2_picknplace_left/pr2_picknplace",
@@ -65,30 +68,32 @@ bool BoxDelivery::pick_up_callback(
     geometry_msgs::Pose loc;
     if (box_poses[request.box_frame].header.frame_id == "base_link") {
 
-        Eigen::Affine3d t1 = tf2::transformToEigen(
-                                 box_poses[request.box_frame]);
-        // Rotate Gripper 90 deg in Y axis
+        // Eigen::Affine3d t1 = tf2::transformToEigen(
+        //                          box_poses[request.box_frame]);
+        // // // Rotate Gripper 90 deg in Y axis
         // Eigen::Affine3d t2;
-        // t2 = Eigen::AngleAxisd(0.5 * M_PI,  Eigen::Vector3d::UnitZ());
+        // t2 = Eigen::AngleAxisd(-0.5 * M_PI,  Eigen::Vector3d::UnitZ());
 
-        // Eigen::Affine3d t3;
-        // t3 = Eigen::AngleAxisd(0.5 * M_PI,  Eigen::Vector3d::UnitY());
+        // // Eigen::Affine3d t3;
+        // // t3 = Eigen::AngleAxisd(-0.5 * M_PI,  Eigen::Vector3d::UnitX());
 
-        Eigen::Affine3d t = t1;
+        // Eigen::Affine3d t = t2 * t1;
 
         loc.position.x = box_poses[request.box_frame].transform.translation.x;
         loc.position.y = box_poses[request.box_frame].transform.translation.y;
         loc.position.z = box_poses[request.box_frame].transform.translation.z;
-        Eigen::Quaterniond q(t.rotation());
-        loc.orientation.x = q.x();
-        loc.orientation.y = q.y();
-        loc.orientation.z = q.z();
-        loc.orientation.w = q.w();
-        // loc.orientation.x = 0.707; // box_poses[request.box_frame].transform.rotation.x;
-        // loc.orientation.y = 0; // box_poses[request.box_frame].transform.rotation.y;
-        // loc.orientation.z = 0; // box_poses[request.box_frame].transform.rotation.z;
-        // loc.orientation.w = 0.707; // box_poses[request.box_frame].transform.rotation.w;
+        // Eigen::Quaterniond q(t.rotation());
+        // loc.orientation.x = q.x();
+        // loc.orientation.y = q.y();
+        // loc.orientation.z = q.z();
+        // loc.orientation.w = q.w();
+        loc.orientation.x = 0.707; // box_poses[request.box_frame].transform.rotation.x;
+        loc.orientation.y = 0; // box_poses[request.box_frame].transform.rotation.y;
+        loc.orientation.z = 0; // box_poses[request.box_frame].transform.rotation.z;
+        loc.orientation.w = 0.707; // box_poses[request.box_frame].transform.rotation.w;
 
+
+        last_pickup_loc = loc;
         ROS_INFO_STREAM("Tf: " << loc);
     } else {
         ROS_WARN_STREAM("Wrong TF base frame! Currently '" <<
@@ -100,7 +105,7 @@ bool BoxDelivery::pick_up_callback(
     }
 
     pr2_picknplace_msgs::PickPlaceGoal pick;
-    pick.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST;
+    pick.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::PICK_REQUEST;
     pick.goal.header.frame_id = "base_link";
     pick.goal.object_pose = loc;
 
@@ -117,7 +122,7 @@ bool BoxDelivery::pick_up_callback(
     ROS_DEBUG_STREAM("Stat: " << int(pp_left->getResult()->success));
     if (!pp_left->getResult()->success) {
         response.success = false;
-        response.message = "Couldn't execute request";
+        response.message = "Couldn't execute pick request";
         return true;
     }
 
@@ -125,10 +130,41 @@ bool BoxDelivery::pick_up_callback(
     response.message = "Finished pick request successfully for frame " +
                        request.box_frame;
 
+
+    // TODO: Send box to humans face!
+
     ROS_INFO("Finished picking a box");
     return true;
 }
 
+bool BoxDelivery::put_down_callback(
+    std_srvs::Trigger::Request& request,
+    std_srvs::Trigger::Response& response) {
+
+    pr2_picknplace_msgs::PickPlaceGoal place;
+    place.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::PLACE_REQUEST;
+    place.goal.header.frame_id = "base_link";
+    place.goal.object_pose = last_pickup_loc;
+
+    pp_left->sendGoal(place);
+    ROS_INFO_STREAM("Place position: " << place.goal.object_pose.position);
+
+    pp_left->waitForResult(ros::Duration(max_planning_time_));
+    if (pp_left->getState() != actionlib::SimpleClientGoalState::SUCCEEDED) {
+        response.success = false;
+        response.message = "Didn't finish place request in time!";
+        return true;
+    }
+
+    ROS_DEBUG_STREAM("Stat: " << int(pp_left->getResult()->success));
+    if (!pp_left->getResult()->success) {
+        response.success = false;
+        response.message = "Couldn't execute place request";
+        return true;
+    }
+
+    return true;
+}
 
 void BoxDelivery::updatePose(std::string frame,
                              geometry_msgs::TransformStamped p) {
