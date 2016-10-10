@@ -6,8 +6,8 @@
  * @copyright (MIT) 2016 RAD-UoE Informatics
  */
 
-#ifndef PR2_BOX_DELIVERY_HPP
-#define PR2_BOX_DELIVERY_HPP
+#ifndef BOX_DELIVERY_HPP
+#define BOX_DELIVERY_HPP
 
 // System
 #include <string>
@@ -33,10 +33,10 @@ typedef actionlib::SimpleActionClient <pr2_picknplace_msgs::PickPlaceAction>
 PickPlaceAC;
 typedef std::shared_ptr<PickPlaceAC> PickPlaceACPtr;
 
-class PR2BoxDelivery {
+class BoxDelivery {
   public:
-    PR2BoxDelivery(ros::NodeHandle* nh);
-    ~PR2BoxDelivery(void);
+    BoxDelivery(ros::NodeHandle* nh);
+    ~BoxDelivery(void);
 
     void loadParams();
     void init();
@@ -64,4 +64,4 @@ class PR2BoxDelivery {
                           pr2_eye_track_demo::BoxQuery::Response& response);
 };
 
-#endif  /* PR2_BOX_DELIVERY_HPP */
+#endif  /* BOX_DELIVERY_HPP */
