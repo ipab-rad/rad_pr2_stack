@@ -141,7 +141,7 @@ include_directories(
 # add_dependencies(pr2_eye_track_demo ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
-add_executable(pr2_eye_track_demo_node src/pr2_box_delivery.cpp src/pr2_eye_track_demo.cpp)
+add_executable(pr2_eye_track_demo_node src/box_delivery.cpp src/pr2_eye_track_demo.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above

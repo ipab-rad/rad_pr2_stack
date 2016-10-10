@@ -6,7 +6,7 @@
  * @copyright (MIT) 2016 RAD-UoE Informatics
  */
 
-#include "pr2_eye_track_demo/pr2_box_delivery.hpp"
+#include "pr2_eye_track_demo/box_delivery.hpp"
 #include <std_srvs/Empty.h>
 #include <pr2_picknplace_msgs/PicknPlaceGoal.h>
 #include <tf2_eigen/tf2_eigen.h>
