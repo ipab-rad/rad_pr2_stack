@@ -12,7 +12,6 @@
 // System
 #include <string>
 #include <map>
-// #include <Eigen/Geometry>
 
 // ROS
 #include <ros/ros.h>
@@ -28,6 +27,11 @@
 
 // Services
 #include <std_srvs/Empty.h>
+#include <pr2_eye_track_demo/BoxQuery.h>
+
+typedef actionlib::SimpleActionClient <pr2_picknplace_msgs::PickPlaceAction>
+PickPlaceAC;
+typedef std::shared_ptr<PickPlaceAC> PickPlaceACPtr;
 
 class PR2BoxDelivery {
   public:
@@ -45,6 +49,9 @@ class PR2BoxDelivery {
     ros::NodeHandle* nh_;
     ros::ServiceServer pick_up_service;
 
+    PickPlaceACPtr pp_left;
+    PickPlaceACPtr pp_right;
+
     // Variables
     std::string ns_;
     double max_planning_time_;
@@ -53,8 +60,8 @@ class PR2BoxDelivery {
     std::map<std::string, geometry_msgs::TransformStamped> box_poses;
 
     // Methods
-    bool pick_up_callback(std_srvs::Empty::Request& request,
-                          std_srvs::Empty::Response& response);
+    bool pick_up_callback(pr2_eye_track_demo::BoxQuery::Request& request,
+                          pr2_eye_track_demo::BoxQuery::Response& response);
 };
 
 #endif  /* PR2_BOX_DELIVERY_HPP */
