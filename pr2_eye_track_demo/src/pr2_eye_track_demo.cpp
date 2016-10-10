@@ -33,6 +33,28 @@ int main(int argc, char** argv) {
       }
     }
 
+    // switch (etg_roi_) {
+    //     case 0: // Assembling arm
+    //         GiveArmBolts();
+    //         break;
+    //     case 1: // Putting plate spacers
+    //         GivePlateSpacers();
+    //         // GivePlateSpacersAndWrench();
+    //         break;
+    //     case 2: // Putting plate
+    //         GivePlateBoltsAndHold();
+    //         break;
+    //     case 3: // Putting laser on the right
+    //         GiveCableRight();
+    //         break;
+    //     case 4: // Putting laser on the left
+    //         GiveCableLeft();
+    //         break;
+    //     default:
+    //         ros::spinOnce();
+    //         rate_.sleep();
+    // }
+
     r.sleep();
   }
 
