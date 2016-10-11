@@ -1,25 +1,17 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(pr2_eye_track_demo)
+project(pr2_eye_track_demo_msgs)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  actionlib
-  geometry_msgs
-  pr2_picknplace_msgs
-  pr2_eye_track_demo_msgs
-  roscpp
   std_msgs
-  tf2_ros
-  tf2_geometry_msgs
-  tf2_eigen
   message_generation
 )
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
-find_package(Eigen3 REQUIRED)
+
 
 ## Uncomment this if the package has a setup.py. This macro ensures
 ## modules and global scripts declared therein get installed
@@ -57,12 +49,11 @@ find_package(Eigen3 REQUIRED)
 #   Message2.msg
 # )
 
-# Generate services in the 'srv' folder
-# add_service_files(
-#   FILES
-#   BoxQuery.srv
-#   Service2.srv
-# )
+## Generate services in the 'srv' folder
+add_service_files(
+  FILES
+  BoxQuery.srv
+)
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -72,11 +63,10 @@ find_package(Eigen3 REQUIRED)
 # )
 
 ## Generate added messages and services with any dependencies listed here
-# generate_messages(
-#    DEPENDENCIES
-#    geometry_msgs#   pr2_picknplace_msgs#
-#    std_msgs
-# )
+generate_messages(
+  DEPENDENCIES
+  std_msgs
+)
 
 ################################################
 ## Declare ROS dynamic reconfigure parameters ##
@@ -108,9 +98,9 @@ find_package(Eigen3 REQUIRED)
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
- INCLUDE_DIRS include
-#  LIBRARIES pr2_eye_track_demo
-#  CATKIN_DEPENDS actionlib geometry_msgs pr2_gripper_sensor_msgs pr2_picknplace_msgs roscpp std_msgs tf2_eigen tf2_ros
+#  INCLUDE_DIRS include
+#  LIBRARIES pr2_eye_track_demo_msgs
+#  CATKIN_DEPENDS std_msgs
 #  DEPENDS system_lib
 )
 
@@ -118,43 +108,34 @@ catkin_package(
 ## Build ##
 ###########
 
-set(CMAKE_CXX_COMPILER "/usr/bin/clang++-3.6")
-set(CMAKE_C_COMPILER "/usr/bin/clang-3.6")
-set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wno-deprecated-register -O2")
-
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 # include_directories(include)
 include_directories(
-  include
   ${catkin_INCLUDE_DIRS}
-  ${EIGEN3_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
-# add_library(pr2_eye_track_demo
-#   src/${PROJECT_NAME}/pr2_eye_track_demo.cpp
+# add_library(pr2_eye_track_demo_msgs
+#   src/${PROJECT_NAME}/pr2_eye_track_demo_msgs.cpp
 # )
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
-# add_dependencies(pr2_eye_track_demo ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+# add_dependencies(pr2_eye_track_demo_msgs ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
-add_executable(pr2_eye_track_demo_node src/box_delivery.cpp src/pr2_eye_track_demo.cpp)
+# add_executable(pr2_eye_track_demo_msgs_node src/pr2_eye_track_demo_msgs_node.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
-add_dependencies(pr2_eye_track_demo_node
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-  ${catkin_EXPORTED_TARGETS}
-  pr2_eye_track_demo_gencpp)
+# add_dependencies(pr2_eye_track_demo_msgs_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(pr2_eye_track_demo_node
-  ${catkin_LIBRARIES}
-)
+# target_link_libraries(pr2_eye_track_demo_msgs_node
+#   ${catkin_LIBRARIES}
+# )
 
 #############
 ## Install ##
@@ -171,7 +152,7 @@ target_link_libraries(pr2_eye_track_demo_node
 # )
 
 ## Mark executables and/or libraries for installation
-# install(TARGETS pr2_eye_track_demo pr2_eye_track_demo_node
+# install(TARGETS pr2_eye_track_demo_msgs pr2_eye_track_demo_msgs_node
 #   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -196,7 +177,7 @@ target_link_libraries(pr2_eye_track_demo_node
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_pr2_eye_track_demo.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_pr2_eye_track_demo_msgs.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()

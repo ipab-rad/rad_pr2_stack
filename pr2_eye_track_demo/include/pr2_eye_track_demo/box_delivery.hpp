@@ -28,7 +28,7 @@
 // Services
 #include <std_srvs/Empty.h>
 #include <std_srvs/Trigger.h>
-#include <pr2_eye_track_demo/BoxQuery.h>
+#include <pr2_eye_track_demo_msgs/BoxQuery.h>
 
 typedef actionlib::SimpleActionClient <pr2_picknplace_msgs::PickPlaceAction>
 PickPlaceAC;
@@ -63,8 +63,8 @@ class BoxDelivery {
     std::map<std::string, geometry_msgs::TransformStamped> box_poses;
 
     // Methods
-    bool pick_up_callback(pr2_eye_track_demo::BoxQuery::Request& request,
-                          pr2_eye_track_demo::BoxQuery::Response& response);
+    bool pick_up_callback(pr2_eye_track_demo_msgs::BoxQuery::Request& request,
+                          pr2_eye_track_demo_msgs::BoxQuery::Response& response);
     bool put_down_callback(
         std_srvs::Trigger::Request& request,
         std_srvs::Trigger::Response& response);

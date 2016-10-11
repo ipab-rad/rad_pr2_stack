@@ -59,8 +59,8 @@ void BoxDelivery::rosSetup() {
 
 
 bool BoxDelivery::pick_up_callback(
-    pr2_eye_track_demo::BoxQuery::Request& request,
-    pr2_eye_track_demo::BoxQuery::Response& response) {
+    pr2_eye_track_demo_msgs::BoxQuery::Request& request,
+    pr2_eye_track_demo_msgs::BoxQuery::Response& response) {
     ROS_INFO("Picking up box!");
 
     ROS_INFO_STREAM("Initial pose: " << box_poses[request.box_frame]);
