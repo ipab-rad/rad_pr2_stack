@@ -68,29 +68,21 @@ bool BoxDelivery::pick_up_callback(
     geometry_msgs::Pose loc;
     if (box_poses[request.box_frame].header.frame_id == "base_link") {
 
-        // Eigen::Affine3d t1 = tf2::transformToEigen(
-        //                          box_poses[request.box_frame]);
-        // // // Rotate Gripper 90 deg in Y axis
-        // Eigen::Affine3d t2;
-        // t2 = Eigen::AngleAxisd(-0.5 * M_PI,  Eigen::Vector3d::UnitZ());
+        geometry_msgs::Pose box_offset;
+        box_offset.position.x = -0.00;
+        box_offset.position.z = +0.20;
 
-        // // Eigen::Affine3d t3;
-        // // t3 = Eigen::AngleAxisd(-0.5 * M_PI,  Eigen::Vector3d::UnitX());
+        loc.position.x = box_poses[request.box_frame].transform.translation.x +
+                         box_offset.position.x;
+        loc.position.y = box_poses[request.box_frame].transform.translation.y +
+                         box_offset.position.y;
+        loc.position.z = box_poses[request.box_frame].transform.translation.z +
+                         box_offset.position.z;
 
-        // Eigen::Affine3d t = t2 * t1;
-
-        loc.position.x = box_poses[request.box_frame].transform.translation.x;
-        loc.position.y = box_poses[request.box_frame].transform.translation.y;
-        loc.position.z = box_poses[request.box_frame].transform.translation.z;
-        // Eigen::Quaterniond q(t.rotation());
-        // loc.orientation.x = q.x();
-        // loc.orientation.y = q.y();
-        // loc.orientation.z = q.z();
-        // loc.orientation.w = q.w();
-        loc.orientation.x = 0.707; // box_poses[request.box_frame].transform.rotation.x;
-        loc.orientation.y = 0; // box_poses[request.box_frame].transform.rotation.y;
-        loc.orientation.z = 0; // box_poses[request.box_frame].transform.rotation.z;
-        loc.orientation.w = 0.707; // box_poses[request.box_frame].transform.rotation.w;
+        loc.orientation.x = box_poses[request.box_frame].transform.rotation.x;
+        loc.orientation.y = box_poses[request.box_frame].transform.rotation.y;
+        loc.orientation.z = box_poses[request.box_frame].transform.rotation.z;
+        loc.orientation.w = box_poses[request.box_frame].transform.rotation.w;
 
 
         last_pickup_loc = loc;

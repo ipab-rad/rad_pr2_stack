@@ -9,7 +9,7 @@ int main(int argc, char** argv) {
     ros::init(argc, argv, "pr2_eye_track_demo");
     ros::NodeHandle n("~");
 
-    std::string frame_names[] = {"tag_22"}; // TODO: Move to param
+    std::string frame_names[] = {"tag_22", "tag_23"}; // TODO: Move to param
     BoxDelivery box_delivery(&n);
 
     tf2_ros::Buffer tfBuffer;
