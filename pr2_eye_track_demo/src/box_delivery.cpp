@@ -13,6 +13,8 @@
 #include <tf2_eigen/tf2_eigen.h>
 #include <Eigen/Geometry>
 
+geometry_msgs::Pose BoxDelivery::box_offset;
+
 BoxDelivery::BoxDelivery(ros::NodeHandle* nh):
     nh_(nh) {
 
@@ -39,6 +41,14 @@ void BoxDelivery::loadParams() {
 }
 
 void BoxDelivery::init() {
+    box_offset.position.x = 0.0;
+    box_offset.position.y = 0.0;
+    box_offset.position.z = 0.2;
+
+    box_offset.orientation.x = 0.0;
+    box_offset.orientation.y = 0.0;
+    box_offset.orientation.z = 0.0;
+    box_offset.orientation.w = 1.0;
 }
 
 void BoxDelivery::rosSetup() {
@@ -55,45 +65,46 @@ void BoxDelivery::rosSetup() {
                            "Waiting for action client 'pr2_picknplace_left/pr2_picknplace'");
     }
     ROS_INFO("Action client '/pr2_picknplace_left/pr2_picknplace' initialized");
+
+    pp_right = PickPlaceACPtr(
+                   new PickPlaceAC("/pr2_picknplace_right/pr2_picknplace", true));
+    while (!pp_right->waitForServer(ros::Duration(wait_time))) {
+        ROS_DEBUG_THROTTLE(wait_time,
+                           "Waiting for action client 'pr2_picknplace_right/pr2_picknplace'");
+    }
+    ROS_INFO("Action client '/pr2_picknplace_right/pr2_picknplace' initialized");
 }
 
+bool BoxDelivery::pickUp(
+    std::string frame,
+    geometry_msgs::Pose offset,
+    std::string arm,
+    std::string& msg) {
 
-bool BoxDelivery::pick_up_callback(
-    pr2_eye_track_demo_msgs::BoxQuery::Request& request,
-    pr2_eye_track_demo_msgs::BoxQuery::Response& response) {
-    ROS_INFO("Picking up box!");
-
-    ROS_INFO_STREAM("Initial pose: " << box_poses[request.box_frame]);
-    // TODO: Check that tf is not stale
     geometry_msgs::Pose loc;
-    if (box_poses[request.box_frame].header.frame_id == "base_link") {
+    if (box_poses[frame].header.frame_id == "base_link") {
 
-        geometry_msgs::Pose box_offset;
-        box_offset.position.x = -0.00;
-        box_offset.position.z = +0.20;
+        loc.position.x = box_poses[frame].transform.translation.x +
+                         offset.position.x;
+        loc.position.y = box_poses[frame].transform.translation.y +
+                         offset.position.y;
+        loc.position.z = box_poses[frame].transform.translation.z +
+                         offset.position.z;
 
-        loc.position.x = box_poses[request.box_frame].transform.translation.x +
-                         box_offset.position.x;
-        loc.position.y = box_poses[request.box_frame].transform.translation.y +
-                         box_offset.position.y;
-        loc.position.z = box_poses[request.box_frame].transform.translation.z +
-                         box_offset.position.z;
-
-        loc.orientation.x = box_poses[request.box_frame].transform.rotation.x;
-        loc.orientation.y = box_poses[request.box_frame].transform.rotation.y;
-        loc.orientation.z = box_poses[request.box_frame].transform.rotation.z;
-        loc.orientation.w = box_poses[request.box_frame].transform.rotation.w;
+        loc.orientation.x = box_poses[frame].transform.rotation.x;
+        loc.orientation.y = box_poses[frame].transform.rotation.y;
+        loc.orientation.z = box_poses[frame].transform.rotation.z;
+        loc.orientation.w = box_poses[frame].transform.rotation.w;
 
 
         last_pickup_loc = loc;
         ROS_INFO_STREAM("Tf: " << loc);
     } else {
         ROS_WARN_STREAM("Wrong TF base frame! Currently '" <<
-                        box_poses[request.box_frame].header.frame_id  <<
-                        "'. Expecting base_link");
-        response.success = false;
-        response.message = "Wrong TF base frame! Probably haven't seen the tag";
-        return true;
+                        box_poses[frame].header.frame_id  <<
+                        "'. Expecting 'base_link'.");
+        msg = "Wrong TF base frame! Probably haven't seen the tag";
+        return false;
     }
 
     pr2_picknplace_msgs::PickPlaceGoal pick;
@@ -101,31 +112,49 @@ bool BoxDelivery::pick_up_callback(
     pick.goal.header.frame_id = "base_link";
     pick.goal.object_pose = loc;
 
-    pp_left->sendGoal(pick);
+    PickPlaceACPtr pp;
+    if (arm == "left") {
+        pp = pp_left;
+    } else if (arm == "right") {
+        pp = pp_right;
+    } else {
+        msg = "Wrong arm specifier: '" + arm + "'. Use 'left' or 'right'.";
+        ROS_WARN_STREAM(msg);
+        return false;
+    }
+
+    ROS_INFO("Sending pick request!");
+    pp->sendGoal(pick);
     ROS_INFO_STREAM("Pick position: " << pick.goal.object_pose.position);
 
-    pp_left->waitForResult(ros::Duration(max_planning_time_));
-    if (pp_left->getState() != actionlib::SimpleClientGoalState::SUCCEEDED) {
-        response.success = false;
-        response.message = "Didn't finish pick request in time!";
-        return true;
+    pp->waitForResult(ros::Duration(max_planning_time_));
+    if (pp->getState() != actionlib::SimpleClientGoalState::SUCCEEDED) {
+        msg = "Didn't finish pick request in time!";
+        return false;
     }
 
-    ROS_DEBUG_STREAM("Stat: " << int(pp_left->getResult()->success));
-    if (!pp_left->getResult()->success) {
-        response.success = false;
-        response.message = "Couldn't execute pick request";
-        return true;
+    ROS_DEBUG_STREAM("Stat: " << int(pp->getResult()->success));
+    if (!pp->getResult()->success) {
+        msg = "Couldn't execute pick request";
+        return false;
     }
 
-    response.success = true;
-    response.message = "Finished pick request successfully for frame " +
-                       request.box_frame;
-
+    msg = "Finished pick request successfully for frame " + frame;
 
     // TODO: Send box to humans face!
-
     ROS_INFO("Finished picking a box");
+    return true;
+}
+
+bool BoxDelivery::pick_up_callback(
+    pr2_eye_track_demo_msgs::BoxQuery::Request& request,
+    pr2_eye_track_demo_msgs::BoxQuery::Response& response) {
+    ROS_INFO("Picking up box!");
+
+    std::string msg;
+    response.success = pickUp(request.box_frame, box_offset, request.arm, msg);
+    response.message = msg;
+
     return true;
 }
 
