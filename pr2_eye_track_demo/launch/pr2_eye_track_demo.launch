@@ -1,13 +1,19 @@
 <launch>
     <node name="pr2_eye_track_demo" pkg="pr2_eye_track_demo" type="pr2_eye_track_demo_node" output="screen"  />
 
-
     <node name="apriltag_detector" pkg="apriltags_ros" type="apriltag_detector_node" output="screen" ns="apriltag_ns">
         <remap from="image_rect" to="/kinect2/hd/image_color_rect"/>
+        <remap from="camera_info" to="/kinect2/hd/camera_info" />
         <param name="image_transport" type="str" value="compressed" />
         <param name="sensor_frame_id" value="head_mount_kinect2_rgb_optical_frame"/>
         <rosparam param="tag_descriptions">[
-            {id: 22, size: 0.05, frame_id: tag_22},
+            {id: 10, size: 0.042},
+            {id: 22, size: 0.042},
+            {id: 57, size: 0.028},
+            {id: 58, size: 0.028},
+            {id: 59, size: 0.028},
+            {id: 60, size: 0.028},
+            {id: 20, size: 0.05},
             {id: 23, size: 0.05, frame_id: tag_23}]
         </rosparam>
     </node>
