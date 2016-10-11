@@ -1,5 +1,5 @@
 /**
- * @file      pr2_box_delivery.hpp
+ * @file      box_delivery.hpp
  * @brief     Provides basic pick up and place of boxes
  * @author    Daniel Angelov <d.angelov@ed.ac.uk>
  * @date      2016-10-04
