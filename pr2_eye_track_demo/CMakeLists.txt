@@ -7,6 +7,7 @@ project(pr2_eye_track_demo)
 find_package(catkin REQUIRED COMPONENTS
   actionlib
   geometry_msgs
+  pr2_machine
   pr2_picknplace_msgs
   pr2_eye_track_demo_msgs
   roscpp
