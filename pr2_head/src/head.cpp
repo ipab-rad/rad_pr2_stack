@@ -73,7 +73,7 @@ void Head::ready() {
 
 void Head::updateLookingPosition() {
   bool new_obj = target_object_ != look_at_object_;
-  if (target_object_ != "") {
+  if (target_object_ != "" && target_object_.compare("none") != 0) {
     if ((new_obj) || (follow_object_ == true) ) {
       look_at_object_ = target_object_;
       if (new_obj && vocally_declare_object_) {
