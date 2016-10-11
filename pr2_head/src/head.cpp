@@ -50,6 +50,9 @@ void Head::loadParams() {
 void Head::init() {
   target_object_ = "";
   look_at_object_ = "";
+  target_offset_.x = 0.0;
+  target_offset_.y = 0.0;
+  target_offset_.z = 0.0;
 }
 
 void Head::rosSetup() {
@@ -59,16 +62,17 @@ void Head::rosSetup() {
   nod_srv_ = nh_.advertiseService("nod", &Head::nodCB, this);
 }
 
-void Head::objCB(const std_msgs::String::Ptr msg) {
+void Head::objCB(const pr2_head_msgs::LookAt::Ptr msg) {
   ROS_INFO_STREAM("Last target object: " << target_object_);
-  target_object_ = msg->data;
+  target_object_ = msg->frame;
+  target_offset_ = msg->offset;
   ROS_INFO_STREAM("New target object : " << target_object_);
 }
 
 void Head::ready() {
   this->speak("PR2 Ready");
   if (look_table_)
-  {this->lookAt("base_link", table_pos_.x, table_pos_.y, table_pos_.z);}
+  {this->lookAt("base_link", table_pos_);}
 }
 
 void Head::updateLookingPosition() {
@@ -80,17 +84,19 @@ void Head::updateLookingPosition() {
         std::string sentence = "Looking at " + look_at_object_;
         this->speak(sentence);
       }
-      this->lookAt(look_at_object_, 0.0, 0.0, 0.0);
+      this->lookAt(look_at_object_, target_offset_);
     }
   }
 }
 
-bool Head::lookAt(std::string frame_id, double x, double y, double z) {
+bool Head::lookAt(std::string frame_id, geometry_msgs::Point offset) {
   pr2_controllers_msgs::PointHeadGoal goal;
 
   geometry_msgs::PointStamped point;
   point.header.frame_id = frame_id;
-  point.point.x = x; point.point.y = y; point.point.z = z;
+  point.point.x = offset.x; 
+  point.point.y = offset.y; 
+  point.point.z = offset.z;
   goal.target = point;
 
   goal.pointing_frame = "head_plate_frame"; //"high_def_frame";
@@ -126,18 +132,28 @@ bool Head::say(pr2_head::Query::Request&  req,
 
 void Head::shake(uint n) {
   uint count = 0;
+  geometry_msgs::Point point;
+  point.x = 5.0;
+  point.y = 1.0;
+  point.z = 1.2;
   while (ros::ok() && ++count <= n ) {
-    this->lookAt("base_link", 5.0, 1.0, 1.2);
-    this->lookAt("base_link", 5.0, -1.0, 1.2);
+    this->lookAt("base_link", point);
+    point.y = -1.0;
+    this->lookAt("base_link", point);
   }
   updateLookingPosition();
 }
 
 void Head::nod(uint n) {
   uint count = 0;
+  geometry_msgs::Point point;
+  point.x = 5.0;
+  point.y = 0.0;
+  point.z = -1.0;
   while (ros::ok() && ++count <= n ) {
-    this->lookAt("base_link", 5.0, 0.0, -1.0);
-    this->lookAt("base_link", 5.0, 0.0, 2.0);
+    this->lookAt("base_link", point);
+    point.z = 2.0;
+    this->lookAt("base_link", point);
   }
   updateLookingPosition();
 }
