@@ -1,7 +1,23 @@
 <launch>
-    <node name="pr2_eye_track_demo" pkg="pr2_eye_track_demo" type="pr2_eye_track_demo_node" output="screen"  />
+    <include file="$(find pr2_machine)/pr2.machine" />
 
-    <node name="apriltag_detector" pkg="apriltags_ros" type="apriltag_detector_node" output="screen" ns="apriltag_ns">
+    <machine name="localhost"
+             address="localhost"/>
+
+    <arg name="machine" default="c2"/>
+
+    <node name="pr2_eye_track_demo"
+          pkg="pr2_eye_track_demo"
+          type="pr2_eye_track_demo_node"
+          output="screen"
+          machine="$(arg machine)"/>
+
+    <node name="apriltag_detector"
+          pkg="apriltags_ros"
+          type="apriltag_detector_node"
+          output="screen"
+          ns="apriltag_ns"
+          machine="$(arg machine)">
         <remap from="image_rect" to="/kinect2/hd/image_color_rect"/>
         <remap from="camera_info" to="/kinect2/hd/camera_info" />
         <param name="image_transport" type="str" value="compressed" />

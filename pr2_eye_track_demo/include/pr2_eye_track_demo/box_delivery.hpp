@@ -62,12 +62,23 @@ class BoxDelivery {
 
     std::map<std::string, geometry_msgs::TransformStamped> box_poses;
 
+    static geometry_msgs::Pose box_offset;
+
     // Methods
-    bool pick_up_callback(pr2_eye_track_demo_msgs::BoxQuery::Request& request,
-                          pr2_eye_track_demo_msgs::BoxQuery::Response& response);
+    bool pickUp(
+        std::string frame,
+        geometry_msgs::Pose offset,
+        std::string arm,
+        std::string& msg);
+
+    // Service callbacks
+    bool pick_up_callback(
+        pr2_eye_track_demo_msgs::BoxQuery::Request& request,
+        pr2_eye_track_demo_msgs::BoxQuery::Response& response);
     bool put_down_callback(
         std_srvs::Trigger::Request& request,
         std_srvs::Trigger::Response& response);
+
 };
 
 #endif  /* BOX_DELIVERY_HPP */
