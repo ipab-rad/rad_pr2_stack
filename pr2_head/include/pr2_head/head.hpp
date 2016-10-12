@@ -20,6 +20,7 @@
 #include <sound_play/SoundRequestAction.h>
 #include <pr2_head/Query.h>
 #include <std_srvs/Empty.h>
+ #include <pr2_head_msgs/LookAt.h>
 
 typedef actionlib::SimpleActionClient
 <pr2_controllers_msgs::PointHeadAction> PointHeadClient;
@@ -36,7 +37,7 @@ class Head {
 
   void ready();
   void updateLookingPosition();
-  bool lookAt(std::string frame_id, double x, double y, double z);
+  bool lookAt(std::string frame_id, geometry_msgs::Point offset);
   void speak(std::string sentence);
   bool say(pr2_head::Query::Request&  req,
            pr2_head::Query::Response& res);
@@ -48,7 +49,7 @@ class Head {
   void loadParams();
   void init();
   void rosSetup();
-  void objCB(const std_msgs::String::Ptr msg);
+  void objCB(const pr2_head_msgs::LookAt::Ptr msg);
   bool shakeCB(std_srvs::Empty::Request& req,
                std_srvs::Empty::Response& res);
   bool nodCB(std_srvs::Empty::Request& req,
@@ -59,10 +60,11 @@ class Head {
   // Parameters
   bool follow_object_;
   bool look_table_;
-  geometry_msgs::Vector3 table_pos_;
+  geometry_msgs::Point table_pos_;
 
   // Variables
   std::string target_object_;
+  geometry_msgs::Point target_offset_;
   std::string look_at_object_;
   bool vocally_declare_object_;
   double max_waiting_time_;
