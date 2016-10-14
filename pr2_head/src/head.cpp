@@ -66,6 +66,7 @@ void Head::objCB(const pr2_head_msgs::LookAt::Ptr msg) {
   ROS_INFO_STREAM("Last target object: " << target_object_);
   target_object_ = msg->frame;
   target_offset_ = msg->offset;
+  follow_object_ = msg->follow;
   ROS_INFO_STREAM("New target object : " << target_object_);
 }
 
@@ -77,7 +78,7 @@ void Head::ready() {
 
 void Head::updateLookingPosition() {
   bool new_obj = target_object_ != look_at_object_;
-  if (target_object_ != "" && target_object_.compare("none") != 0) {
+  if (target_object_ != "") {
     if ((new_obj) || (follow_object_ == true) ) {
       look_at_object_ = target_object_;
       if (new_obj && vocally_declare_object_) {
