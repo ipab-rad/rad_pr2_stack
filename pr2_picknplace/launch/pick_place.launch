@@ -9,7 +9,8 @@
 
     <node pkg="tf" type="static_transform_publisher" name="tabletop_broadcaster" args="0.5 0 0.725 0 0 0 1 odom_combined tabletop 100" />
 
-    <rosparam file="$(find pr2_picknplace)/cfg/picknplace_config.yaml" ns="pick_place" command="load" />
+    <rosparam file="$(find pr2_picknplace)/cfg/picknplace_config.yaml" ns="pr2_picknplace_right" command="load" />
+    <rosparam file="$(find pr2_picknplace)/cfg/picknplace_config.yaml" ns="pr2_picknplace_left" command="load" />
 
     <node name="pr2_picknplace_right" pkg="pr2_picknplace" type="pr2_picknplace" output="screen" clear_params="true" args="right_arm">
         <remap from="pr2_picknplace/collision_object" to="/collision_object" />
