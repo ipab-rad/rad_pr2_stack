@@ -1,17 +1,12 @@
 cmake_minimum_required(VERSION 2.8.3)
-project(pr2_head)
+project(pr2_head_msgs)
 
 ## Find catkin macros and libraries
 ## if COMPONENTS list like find_package(catkin REQUIRED COMPONENTS xyz)
 ## is used, also find other catkin packages
 find_package(catkin REQUIRED COMPONENTS
-  roscpp
-  rospy
-  actionlib
-  sound_play
-  pr2_controllers_msgs
-  pr2_head_msgs
-  std_srvs
+  geometry_msgs
+  std_msgs
   message_generation
 )
 
@@ -49,17 +44,17 @@ find_package(catkin REQUIRED COMPONENTS
 ##   * add every package in MSG_DEP_SET to generate_messages(DEPENDENCIES ...)
 
 ## Generate messages in the 'msg' folder
-# add_message_files(
-#   FILES
-#   Message1.msg
-#   Message2.msg
-# )
+add_message_files(
+  FILES
+  LookAt.msg
+)
 
 ## Generate services in the 'srv' folder
-add_service_files(
-  FILES
-  Query.srv
-)
+# add_service_files(
+#   FILES
+#   Service1.srv
+#   Service2.srv
+# )
 
 ## Generate actions in the 'action' folder
 # add_action_files(
@@ -71,8 +66,8 @@ add_service_files(
 ## Generate added messages and services with any dependencies listed here
 generate_messages(
   DEPENDENCIES
+  geometry_msgs
   std_msgs
-  pr2_head_msgs
 )
 
 ################################################
@@ -105,51 +100,46 @@ generate_messages(
 ## CATKIN_DEPENDS: catkin_packages dependent projects also need
 ## DEPENDS: system dependencies of this project that dependent projects also need
 catkin_package(
- INCLUDE_DIRS include
-#  LIBRARIES pr2_head
-#  CATKIN_DEPENDS other_catkin_pkg
+#  INCLUDE_DIRS include
+#  LIBRARIES pr2_head_msgs
+#  CATKIN_DEPENDS geometry_msgs std_msgs
 #  DEPENDS system_lib
 )
 
 ###########
 ## Build ##
 ###########
-set(CMAKE_CXX_COMPILER "/usr/bin/clang++-3.6")
-set(CMAKE_C_COMPILER "/usr/bin/clang-3.6")
-set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wno-deprecated-register -O2")
+
+set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -Wall -O2")
 
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
+# include_directories(include)
 include_directories(
-  include
   ${catkin_INCLUDE_DIRS}
 )
 
 ## Declare a C++ library
-# add_library(pr2_head
-#   src/${PROJECT_NAME}/pr2_head.cpp
+# add_library(pr2_head_msgs
+#   src/${PROJECT_NAME}/pr2_head_msgs.cpp
 # )
 
 ## Add cmake target dependencies of the library
 ## as an example, code may need to be generated before libraries
 ## either from message generation or dynamic reconfigure
-# add_dependencies(pr2_head ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
+# add_dependencies(pr2_head_msgs ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
-add_executable(pr2_head src/pr2_head.cpp src/head.cpp)
+# add_executable(pr2_head_msgs_node src/pr2_head_msgs_node.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above
-add_dependencies(pr2_head
-  ${${PROJECT_NAME}_EXPORTED_TARGETS}
-  ${catkin_EXPORTED_TARGETS}
-  pr2_head_gencpp
-)
+# add_dependencies(pr2_head_msgs_node ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Specify libraries to link a library or executable target against
-target_link_libraries(pr2_head
-  ${catkin_LIBRARIES}
-)
+# target_link_libraries(pr2_head_msgs_node
+#   ${catkin_LIBRARIES}
+# )
 
 #############
 ## Install ##
@@ -166,7 +156,7 @@ target_link_libraries(pr2_head
 # )
 
 ## Mark executables and/or libraries for installation
-# install(TARGETS pr2_head pr2_head_node
+# install(TARGETS pr2_head_msgs pr2_head_msgs_node
 #   ARCHIVE DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   LIBRARY DESTINATION ${CATKIN_PACKAGE_LIB_DESTINATION}
 #   RUNTIME DESTINATION ${CATKIN_PACKAGE_BIN_DESTINATION}
@@ -191,7 +181,7 @@ target_link_libraries(pr2_head
 #############
 
 ## Add gtest based cpp test target and link libraries
-# catkin_add_gtest(${PROJECT_NAME}-test test/test_pr2_head.cpp)
+# catkin_add_gtest(${PROJECT_NAME}-test test/test_pr2_head_msgs.cpp)
 # if(TARGET ${PROJECT_NAME}-test)
 #   target_link_libraries(${PROJECT_NAME}-test ${PROJECT_NAME})
 # endif()
