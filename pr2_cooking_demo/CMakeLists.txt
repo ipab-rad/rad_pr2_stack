@@ -8,6 +8,9 @@ find_package(catkin REQUIRED COMPONENTS
   roscpp
   rospy
   std_msgs
+  actionlib
+  pr2_head_msgs
+  pr2_picknplace_msgs
 )
 
 ## System dependencies are found with CMake's conventions
@@ -110,10 +113,15 @@ catkin_package(
 ## Build ##
 ###########
 
+set(CMAKE_CXX_COMPILER "/usr/bin/clang++-3.6")
+set(CMAKE_C_COMPILER "/usr/bin/clang-3.6")
+set(CMAKE_CXX_FLAGS  "${CMAKE_CXX_FLAGS} -std=c++11 -Wall -Wno-deprecated-register -O2")
+
 ## Specify additional locations of header files
 ## Your package locations should be listed before other locations
 # include_directories(include)
 include_directories(
+  include
   ${catkin_INCLUDE_DIRS}
 )
 
@@ -128,7 +136,7 @@ include_directories(
 # add_dependencies(pr2_cooking_demo ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 ## Declare a C++ executable
-add_executable(pr2_cooking_demo_node src/pr2_cooking_demo_node.cpp)
+add_executable(pr2_cooking_demo_node src/pr2_cooking_demo.cpp src/cooking.cpp)
 
 ## Add cmake target dependencies of the executable
 ## same as for the library above

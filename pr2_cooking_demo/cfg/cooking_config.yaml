@@ -1,0 +1,5 @@
+max_planning_time: 10.0
+banana_and_apple_phrase: 'Yes, I can. I see a banana and an apple. Should I use them?'
+use_bowl_phrase: 'Ok, I also see a plate. Should I put the fruits in it?'
+ok_making_salad_phrase: 'Ok, I am making the fruit salad.'
+no_banana_use_orange_phrase: 'Yes, I can. I do not see a banana, but I see an orange. Should I use it instead?'

@@ -8,23 +8,16 @@
         type="apriltag_detector_node"
         output="screen">
       <param name="image_transport" type="str" value="compressed"/>
-      <rosparam param="tag_descriptions">
-        [
-        <!-- {id: 1, size: 0.04, frame_id: banana},  --> <!-- ID1 NOT GOOD -->
-        <!-- {id: 2, size: 0.04, frame_id: tomatoes},
-        {id: 3, size: 0.04, frame_id: bowl},
-        {id: 4, size: 0.04, frame_id: carrots},
-        {id: 5, size: 0.04, frame_id: bananas},
-        {id: 6, size: 0.04, frame_id: spoon},
-        {id: 7, size: 0.04, frame_id: tomatoes},
-        {id: 8, size: 0.04, frame_id: saucepan},
-        {id: 9, size: 0.04, frame_id: milk},
-        {id: 10, size: 0.04, frame_id: cookies},
-        {id: 11, size: 0.04, frame_id: knife},
-        {id: 12, size: 0.04, frame_id: water}, -->]
+      <rosparam param="tag_descriptions"> [
+          {id: 469, size: 0.05, frame_id: 'banana'},
+          {id: 470, size: 0.05, frame_id: 'apple1'},
+          {id: 475, size: 0.05, frame_id: 'apple2'},
+          {id: 473, size: 0.05, frame_id: 'orange'},
+          {id: 472, size: 0.05, frame_id: 'bowl1'},
+          {id: 476, size: 0.05, frame_id: 'bowl2'}]
       </rosparam>
   </node>
-  <node name="pr2_cooking_demo" pkg="pr2_cooking_demo" type="pr2_cooking_demo" output="screen" clear_params="true">
+  <node name="pr2_cooking_demo_node" pkg="pr2_cooking_demo" type="pr2_cooking_demo_node" output="screen" clear_params="true">
     <rosparam file="$(find pr2_cooking_demo)/cfg/cooking_config.yaml" command="load" />
   </node>
 
