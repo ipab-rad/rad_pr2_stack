@@ -22,7 +22,7 @@ PickPlaceAction::PickPlaceAction(ros::NodeHandle& nh, std::string name,
   as_.registerGoalCallback(boost::bind(&PickPlaceAction::goalCB, this));
   as_.registerPreemptCallback(boost::bind(&PickPlaceAction::preemptCB, this));
 
-  ns_ = ros::this_node::getNamespace() + "_" + name;
+  ns_ = ros::this_node::getNamespace() + name + "_" + arm.substr(0, arm.find("_"));
 
   if (arm == "right_arm") {
     wrist_roll_link = "r_wrist_roll_link";
