@@ -19,6 +19,7 @@ int main(int argc, char** argv) {
         switch (state) {  
             case 0: // Look around and talk
                 ros::Duration(5).sleep();
+                cooking.say("Ok");
                 cooking.look_at("table");
                 ros::Duration(3).sleep();
                 cooking.look_at("banana");

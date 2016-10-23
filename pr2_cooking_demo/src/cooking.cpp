@@ -49,7 +49,7 @@ void Cooking::init() {
 
     fruit_offset.position.x = 0.0;
     fruit_offset.position.y = 0.03;
-    fruit_offset.position.z = 0.005;
+    fruit_offset.position.z = 0.002;
     fruit_offset.orientation.x = 0.707;
     fruit_offset.orientation.y = 0.0;
     fruit_offset.orientation.z = 0.0;
@@ -122,7 +122,7 @@ bool Cooking::manipulateObject(
         fruit_offset.position.y = 0.03;                
         pick.goal.object_pose = fruit_offset;    
     }
-    
+
     PickPlaceACPtr pp;
     if (arm == "left") {
         pp = pp_left;
@@ -153,6 +153,67 @@ bool Cooking::manipulateObject(
     return true;
 }
 
+bool Cooking::pickSimFruits(
+    std::string frame_left,
+    std::string frame_right) {
+
+    pr2_picknplace_msgs::PickPlaceGoal pick_left;
+    pr2_picknplace_msgs::PickPlaceGoal pick_right;
+
+    pick_left.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::PICK_REQUEST;
+    pick_left.goal.header.frame_id = frame_left;
+
+    pick_right.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::PICK_REQUEST;
+    pick_right.goal.header.frame_id = frame_right;
+    
+    pick_right.goal.object_pose = fruit_offset;
+
+    if (frame_left == "banana") {
+        fruit_offset.position.y = 0.1;
+        pick_left.goal.object_pose = fruit_offset;
+    }
+    else {
+        fruit_offset.position.y = 0.03;                
+        pick_left.goal.object_pose = fruit_offset;   
+    }
+
+    ROS_INFO("Sending pick requests!");
+    pp_left->sendGoal(pick_left);
+    pp_right->sendGoal(pick_right);
+
+    ROS_INFO_STREAM("Pick frame: " << pick_left.goal.header.frame_id);
+    ROS_INFO_STREAM("Pick frame: " << pick_right.goal.header.frame_id);
+
+    pp_left->waitForResult(ros::Duration(max_planning_time_));
+    pp_right->waitForResult(ros::Duration(max_planning_time_));
+
+    if (pp_left->getState() != actionlib::SimpleClientGoalState::SUCCEEDED) {
+        ROS_INFO("Didn't finish pick request in time!");
+        return false;
+    }
+
+    ROS_DEBUG_STREAM("Stat: " << int(pp_left->getResult()->success));
+    if (!pp_left->getResult()->success) {
+        ROS_INFO("Couldn't execute pick request");
+        return false;
+    }
+
+    if (pp_right->getState() != actionlib::SimpleClientGoalState::SUCCEEDED) {
+        ROS_INFO("Didn't finish pick request in time!");
+        return false;
+    }
+
+    ROS_DEBUG_STREAM("Stat: " << int(pp_right->getResult()->success));
+    if (!pp_right->getResult()->success) {
+        ROS_INFO("Couldn't execute pick request");
+        return false;
+    } 
+
+    ROS_INFO_STREAM("Finished pick request successfully for frame " << frame_left);
+    ROS_INFO_STREAM("Finished pick request successfully for frame " << frame_right);
+    return true;
+}
+
 int Cooking::get_state() {
     return state;
 }
@@ -165,21 +226,16 @@ void Cooking::combine_fruits(std::string fruit1, std::string fruit2, std::string
 
     // Pick the fruits
     look_at(fruit1);
-    manipulateObject(fruit1,
-                     pr2_picknplace_msgs::PicknPlaceGoal::PICK_REQUEST, "right");
+    pickSimFruits(fruit1, fruit2);
+
     look_at(bowl);
     manipulateObject(bowl,
                      pr2_picknplace_msgs::PicknPlaceGoal::PLACE_REQUEST, "right");
     manipulateObject("base_link",
                      pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST, "right");
 
-
     bowl_offset.position.y = 0.1;
 
-    look_at(fruit2);
-    manipulateObject(fruit2,
-                     pr2_picknplace_msgs::PicknPlaceGoal::PICK_REQUEST, "left");
-    look_at(bowl);
     manipulateObject(bowl,
                      pr2_picknplace_msgs::PicknPlaceGoal::PLACE_REQUEST, "left");
     manipulateObject("base_link",

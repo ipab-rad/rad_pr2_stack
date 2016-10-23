@@ -71,6 +71,10 @@ class Cooking {
         uint request,
         std::string arm);
 
+    bool pickSimFruits(
+    std::string frame_left,
+    std::string frame_right);
+
 };
 
 #endif  /* COOKING_HPP */
