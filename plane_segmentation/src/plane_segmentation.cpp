@@ -601,7 +601,7 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
             pcl::EuclideanClusterExtraction<pcl::PointXYZRGB> ec;
             // TODO: Extract the numbers as dynamic param
             ec.setClusterTolerance(0.02); // 2cm
-            ec.setMinClusterSize(100);
+            ec.setMinClusterSize(10); // was 100 for qhd and hd, attempying 10 for sd
             ec.setMaxClusterSize(250000);
             ec.setSearchMethod(tree);
             ec.setInputCloud(objects);
@@ -617,7 +617,7 @@ void new_cloud_2_process(const pcl::PCLPointCloud2::ConstPtr& msg) {
             if (cluster_indices.size() > 0) {
                 // Get a cluster
                 tStart = clock();
-                Eigen::Vector4d master_point(0.5, -0.2, 0.75, 1);
+                Eigen::Vector4d master_point(0.5, -0.05, 0.75, 1); // y is for left-right
                 double min_dist = DBL_MAX;
                 int min_idx = 0;
                 for (int i = 0; i < cluster_indices.size(); ++i) {

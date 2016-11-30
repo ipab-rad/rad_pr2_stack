@@ -86,6 +86,7 @@ class GraspManager {
 
 	int eval_thresh;
 	double last_slope;
+	int waiting_pc_req;
 
 	// ROS
 	actionlib::SimpleActionClient <haf_grasping::CalcGraspPointsServerAction>

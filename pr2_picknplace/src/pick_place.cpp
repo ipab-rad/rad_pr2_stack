@@ -58,8 +58,9 @@ PickPlaceAction::PickPlaceAction(ros::NodeHandle& nh, std::string name,
     this->AddCollisionObjs();
   }
 
-  ROS_INFO("[PICKPLACEACTION] Starting PickPlace action server.");
+  ROS_INFO("[PICKPLACEACTION] Starting PickPlace action server...");
   as_.start();
+  ROS_INFO("[PICKPLACEACTION] Started action server.");
 }
 
 PickPlaceAction::~PickPlaceAction() {
@@ -711,12 +712,17 @@ moveit::core::RobotState PickPlaceAction::CreateEmptyRobotState() {
 bool PickPlaceAction::RobotStateFromPose(const geometry_msgs::Pose p,
                                          moveit::core::RobotState& robot_sate) {
   // state(*move_group_arm.getCurrentState());
+  int attmpt = 0;
+  bool ok = false;
+  // do {
+  attmpt++;
   const robot_state::JointModelGroup* joint_model_group =
     robot_sate.getJointModelGroup(move_group_arm.getName());
-  bool ok = robot_sate.setFromIK(joint_model_group, p, gripper_tool_frame);
+  ok = robot_sate.setFromIK(joint_model_group, p, gripper_tool_frame);
   if (!ok) {
-    ROS_DEBUG_STREAM("Cannot get IK to go to " << p);
+    ROS_ERROR_STREAM("Cannot get IK to go to " << p);
   }
+  // } while (attmpt < 1000 && !ok);
   return ok;
 }
 

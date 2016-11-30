@@ -47,7 +47,8 @@ void GraspManager::init() {
   ready_to_grasp_ = true;
   ready_to_pick_ = false;
   ready_to_place_ = false;
-  eval_thresh = 0;
+  eval_thresh = -20;
+  waiting_pc_req = 5;
 
   // Haf Grasping Goal request
   goal_.header.frame_id = "base_link";
@@ -62,7 +63,7 @@ void GraspManager::init() {
 
   grasp_req_.max_calculation_time = ros::Duration(40.0);
   grasp_req_.show_only_best_grasp = true;
-  grasp_req_.threshold_grasp_evaluation = 0;
+  grasp_req_.threshold_grasp_evaluation = eval_thresh;
 
   geometry_msgs::Vector3 appr_vect;
   appr_vect.x = 0.0;
@@ -71,7 +72,7 @@ void GraspManager::init() {
   grasp_req_.approach_vector = appr_vect;
   grasp_req_.gripper_opening_width = 1;
 
-  place_pose_.position.x = 0.7;
+  place_pose_.position.x = 0.6;
   place_pose_.position.y = -0.45;
   place_pose_.position.z = 0.8;
   place_pose_.orientation.x = 0;
@@ -80,8 +81,8 @@ void GraspManager::init() {
   place_pose_.orientation.w = 1;
 
   moveto_pose_.position.x = 0.6;
-  moveto_pose_.position.y = -0.32;
-  moveto_pose_.position.z = 0.9;
+  moveto_pose_.position.y = -0.52;
+  moveto_pose_.position.z = 0.95;
   moveto_pose_.orientation.x = 0;
   moveto_pose_.orientation.y = 0;
   moveto_pose_.orientation.z = 0;
@@ -129,15 +130,23 @@ bool GraspManager::getGrasp() {
   bool success = false;
   if (!pc_ready_) {
     ROS_INFO_THROTTLE(1, "Waiting for PC...");
+    // waiting_pc_req++;
+    // if (waiting_pc_req > 10) {
+    //   ROS_WARN("Resending request!");
+    //   ready_to_grasp_ = true;
+    //   request_pc_.call(empty_); // In case we haven't received it yet
+    //   waiting_pc_req = 0;
+    // }
   } else if (!ready_to_grasp_) {
     ROS_INFO_THROTTLE(1, "Grasp not ready...");
   } else {
+    waiting_pc_req = 0;
     pc_ready_ = false;
     ready_to_grasp_ = false;
-    ROS_INFO("Sending Goal...");
+    ROS_INFO("Sending Goal for Haf Grasping ...");
     goal_.goal.graspinput = grasp_req_;
     haf_ac_.sendGoal(goal_.goal);
-    ROS_INFO("Goal sent!");
+    ROS_INFO("Goal sent (Haf Grasping)!");
 
     bool finished_before_timeout = haf_ac_.waitForResult(ros::Duration(50.0));
     if (finished_before_timeout) {
@@ -145,11 +154,16 @@ bool GraspManager::getGrasp() {
       ROS_INFO("Action finished: %s", state.toString().c_str());
       grasp_res_ = haf_ac_.getResult()->graspOutput;
       std::cout << grasp_res_;
-      if (grasp_res_.eval > eval_thresh) {
+      if (grasp_res_.eval >= eval_thresh) {
         ready_to_pick_ = true;
         success = true;
         ROS_INFO_STREAM("GetGrasp status: " << ((success) ? "success" : "fail"));
-      } else {request_pc_.call(empty_); ready_to_grasp_ = true; }
+      } else {
+        ros::Duration(0.45).sleep(); // wait a bit before requesting a PC
+        request_pc_.call(empty_); ready_to_grasp_ = true;
+        ROS_WARN_STREAM("Grasp was with too low quality!. Got " << grasp_res_.eval <<
+                        " expected at least " << eval_thresh);
+      }
     } else {
       ROS_INFO("Action did not finish before the time out.");
     }
@@ -173,10 +187,10 @@ bool GraspManager::sendPick() {
     pick.goal.object_pose.position = grasp_res_.averagedGraspPoint;
 
     // Kinect Offsets
-    pick.goal.object_pose.position.x -= 0.031;
-    // pick.goal.object_pose.position.y -= 0.02;
+    pick.goal.object_pose.position.x -= 0.05; //0.031;
+    pick.goal.object_pose.position.y += 0.015; // this is for sd pointcloud
     pick.goal.object_pose.position.z =
-      std::max(0.680, pick.goal.object_pose.position.z - 0.055);
+      std::max(0.70, pick.goal.object_pose.position.z - 0.030); //- 0.055
 
     tf2::Quaternion q;    // TODO: WHY DOES IT ONLY WORK LIKE THIS?
     q.setRPY(0, 0, (grasp_res_.roll / M_PI) * 180);
@@ -237,13 +251,16 @@ bool GraspManager::sendPlace(PLACE_LOCATION loc) {
       default:
         ROS_WARN("Wrong location selected!");
         place.goal.object_pose = place_pose_;
+
     }
+
     std::cout << place.goal;
     pickplace_ac_.sendGoal(place);
     bool finished_before_timeout = pickplace_ac_.waitForResult(
                                      ros::Duration(max_ac_execution_time));
     success = pickplace_ac_.getResult()->success;
     ready_to_grasp_ = true;
+    ros::Duration(0.45).sleep(); // wait a bit before requesting a PC
     request_pc_.call(empty_);
   }
   return success;
@@ -261,9 +278,11 @@ bool GraspManager::sendMoveTo() {
   pickplace_ac_.sendGoal(place);
   success &= pickplace_ac_.waitForResult(ros::Duration(max_ac_execution_time));
   success &= pickplace_ac_.getResult()->success;
+  ros::Duration(2).sleep(); // wait a bit before requesting a PC
   request_pc_.call(empty_);
   ready_to_grasp_ = true;
   return success;
+
 }
 
 double GraspManager::isSoft() {
