@@ -39,21 +39,21 @@ void Cooking::loadParams() {
 void Cooking::init() {
     state = 0;
 
-    bowl_offset.position.x = 0.0;
-    bowl_offset.position.y = 0.04;
-    bowl_offset.position.z = 0.05;
-    bowl_offset.orientation.x = 0.707;
-    bowl_offset.orientation.y = 0.0;
-    bowl_offset.orientation.z = 0.0;
-    bowl_offset.orientation.w = 0.707;
+    // bowl_offset.position.x = 0.0;
+    // bowl_offset.position.y = 0.04;
+    // bowl_offset.position.z = 0.05;
+    // bowl_offset.orientation.x = 0.707;
+    // bowl_offset.orientation.y = 0.0;
+    // bowl_offset.orientation.z = 0.0;
+    // bowl_offset.orientation.w = 0.707;
 
-    fruit_offset.position.x = 0.0;
-    fruit_offset.position.y = 0.03;
-    fruit_offset.position.z = 0.002;
-    fruit_offset.orientation.x = 0.707;
-    fruit_offset.orientation.y = 0.0;
-    fruit_offset.orientation.z = 0.0;
-    fruit_offset.orientation.w = 0.707;
+    // fruit_offset.position.x = 0.0;
+    // fruit_offset.position.y = 0.03;
+    // fruit_offset.position.z = 0.002;
+    // fruit_offset.orientation.x = 0.707;
+    // fruit_offset.orientation.y = 0.0;
+    // fruit_offset.orientation.z = 0.0;
+    // fruit_offset.orientation.w = 0.707;
 
     left_arm_offset.position.x = 0.3;
     left_arm_offset.position.z = 0.9;
@@ -70,6 +70,72 @@ void Cooking::init() {
     right_arm_offset.orientation.y = 0.0;
     right_arm_offset.orientation.z = 0.0;
     right_arm_offset.orientation.w = 1.0;
+
+    // RIGHT POURING
+    right_pick_offset.position.x = 0.45;
+    right_pick_offset.position.y = -0.25;
+    right_pick_offset.position.z = 0.71;
+    right_pick_offset.orientation.x = -0.5;
+    right_pick_offset.orientation.y = -0.5;
+    right_pick_offset.orientation.z = 0.5;
+    right_pick_offset.orientation.w = 0.5;
+
+    right_past_pick_offset.position.x = 0.45;
+    right_past_pick_offset.position.y = -0.25;
+    right_past_pick_offset.position.z = 1.0;
+    right_past_pick_offset.orientation.x = -0.5;
+    right_past_pick_offset.orientation.y = -0.5;
+    right_past_pick_offset.orientation.z = 0.5;
+    right_past_pick_offset.orientation.w = 0.5;
+
+    right_pre_pour_offset.position.x = 0.4;
+    right_pre_pour_offset.position.y = -0.05;
+    right_pre_pour_offset.position.z = 1.0;
+    right_pre_pour_offset.orientation.x = -0.5;
+    right_pre_pour_offset.orientation.y = -0.5;
+    right_pre_pour_offset.orientation.z = 0.5;
+    right_pre_pour_offset.orientation.w = 0.5;
+
+    right_pour_offset.position.x = 0.43;
+    right_pour_offset.position.y = -0.05;
+    right_pour_offset.position.z = 0.87;
+    right_pour_offset.orientation.x = 0.354;
+    right_pour_offset.orientation.y = 0.354;
+    right_pour_offset.orientation.z = 0.612;
+    right_pour_offset.orientation.w = 0.612;
+
+    // LEFT POURING
+    left_pick_offset.position.x = 0.45;
+    left_pick_offset.position.y = 0.3;
+    left_pick_offset.position.z = 0.71;
+    left_pick_offset.orientation.x = 0.5;
+    left_pick_offset.orientation.y = -0.5;
+    left_pick_offset.orientation.z = -0.5;
+    left_pick_offset.orientation.w = 0.5;
+
+    left_past_pick_offset.position.x = 0.45;
+    left_past_pick_offset.position.y = 0.3;
+    left_past_pick_offset.position.z = 1.0;
+    left_past_pick_offset.orientation.x = 0.5;
+    left_past_pick_offset.orientation.y = -0.5;
+    left_past_pick_offset.orientation.z = -0.5;
+    left_past_pick_offset.orientation.w = 0.5;
+
+    left_pre_pour_offset.position.x = 0.4;
+    left_pre_pour_offset.position.y = 0.08;
+    left_pre_pour_offset.position.z = 1.0;
+    left_pre_pour_offset.orientation.x = 0.5;
+    left_pre_pour_offset.orientation.y = -0.5;
+    left_pre_pour_offset.orientation.z = -0.5;
+    left_pre_pour_offset.orientation.w = 0.5;
+
+    left_pour_offset.position.x = 0.43;
+    left_pour_offset.position.y = 0.08;
+    left_pour_offset.position.z = 0.87;
+    left_pour_offset.orientation.x = -0.354;
+    left_pour_offset.orientation.y = 0.354;
+    left_pour_offset.orientation.z = -0.612;
+    left_pour_offset.orientation.w = 0.612;
 }
 
 void Cooking::rosSetup() {
@@ -222,6 +288,246 @@ void Cooking::set_state(int state) {
     this->state = state; 
 }
 
+void Cooking::pour_close_right(){
+
+    ROS_INFO("POURING WITH RIGHT CLOSE HAND");
+    pr2_picknplace_msgs::PickPlaceGoal pour;
+    pour.goal.header.frame_id = "base_link";
+    PickPlaceACPtr pp = pp_right;
+
+    pour.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST;
+    pour.goal.object_pose = right_pre_pour_offset;
+    pp->sendGoal(pour);
+    pp->waitForResult(ros::Duration(max_planning_time_));
+
+    pour.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST;
+    right_pre_pour_offset.position.z = 0.85;
+    pour.goal.object_pose = right_pre_pour_offset;
+    pp->sendGoal(pour);
+    pp->waitForResult(ros::Duration(max_planning_time_));
+
+    pour.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST;
+    pour.goal.object_pose = right_pour_offset;
+    pp->sendGoal(pour);
+    pp->waitForResult(ros::Duration(max_planning_time_));
+
+    pour.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST;
+    right_pre_pour_offset.position.z = 1.0;
+    pour.goal.object_pose = right_pre_pour_offset;
+    pp->sendGoal(pour);
+    pp->waitForResult(ros::Duration(max_planning_time_));
+
+    pour.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::PLACE_REQUEST;
+    pour.goal.object_pose = right_pick_offset;
+    pp->sendGoal(pour);
+    pp->waitForResult(ros::Duration(max_planning_time_));
+
+    manipulateObject("base_link",
+                     pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST, "right");
+}
+
+void Cooking::pour_far_right(){
+
+    ROS_INFO("POURING WITH RIGHT FAR HAND");
+    pr2_picknplace_msgs::PickPlaceGoal pour;
+    pour.goal.header.frame_id = "base_link";
+    PickPlaceACPtr pp = pp_right;
+
+    pour.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST;
+    pour.goal.object_pose = right_pre_pour_offset;
+    pp->sendGoal(pour);
+    pp->waitForResult(ros::Duration(max_planning_time_));
+
+    pour.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST;
+    right_pre_pour_offset.position.z = 0.85;
+    pour.goal.object_pose = right_pre_pour_offset;
+    pp->sendGoal(pour);
+    pp->waitForResult(ros::Duration(max_planning_time_));
+
+    pour.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST;
+    pour.goal.object_pose = right_pour_offset;
+    pp->sendGoal(pour);
+    pp->waitForResult(ros::Duration(max_planning_time_));
+
+    pour.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST;
+    right_pre_pour_offset.position.z = 1.0;
+    pour.goal.object_pose = right_pre_pour_offset;
+    pp->sendGoal(pour);
+    pp->waitForResult(ros::Duration(max_planning_time_));
+
+    pour.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::PLACE_REQUEST;
+    pour.goal.object_pose = right_pick_offset;
+    pp->sendGoal(pour);
+    pp->waitForResult(ros::Duration(max_planning_time_));
+
+    manipulateObject("base_link",
+                     pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST, "right");
+}
+
+
+
+void Cooking::pour_close_left(){
+
+    ROS_INFO("POURING WITH LEFT CLOSE HAND");
+    pr2_picknplace_msgs::PickPlaceGoal pour;
+    pour.goal.header.frame_id = "base_link";
+    PickPlaceACPtr pp = pp_left;
+
+    pour.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST;
+    pour.goal.object_pose = left_pre_pour_offset;
+    pp->sendGoal(pour);
+    pp->waitForResult(ros::Duration(max_planning_time_));
+
+    pour.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST;
+    left_pre_pour_offset.position.z = 0.85;
+    pour.goal.object_pose = left_pre_pour_offset;
+    pp->sendGoal(pour);
+    pp->waitForResult(ros::Duration(max_planning_time_));
+
+    pour.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST;
+    pour.goal.object_pose = left_pour_offset;
+    pp->sendGoal(pour);
+    pp->waitForResult(ros::Duration(max_planning_time_));
+
+    pour.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST;
+    left_pre_pour_offset.position.z = 1.0;
+    pour.goal.object_pose = left_pre_pour_offset;
+    pp->sendGoal(pour);
+    pp->waitForResult(ros::Duration(max_planning_time_));
+
+    pour.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::PLACE_REQUEST;
+    pour.goal.object_pose = left_pick_offset;
+    pp->sendGoal(pour);
+    pp->waitForResult(ros::Duration(max_planning_time_));
+
+    manipulateObject("base_link",
+                     pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST, "left");
+}
+
+void Cooking::pour_far_left(){
+
+    ROS_INFO("POURING WITH LEFT FAR HAND");
+    pr2_picknplace_msgs::PickPlaceGoal pour;
+    pour.goal.header.frame_id = "base_link";
+    PickPlaceACPtr pp = pp_left;
+
+    pour.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST;
+    pour.goal.object_pose = left_pre_pour_offset;
+    pp->sendGoal(pour);
+    pp->waitForResult(ros::Duration(max_planning_time_));
+
+    pour.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST;
+    left_pre_pour_offset.position.z = 0.85;
+    pour.goal.object_pose = left_pre_pour_offset;
+    pp->sendGoal(pour);
+    pp->waitForResult(ros::Duration(max_planning_time_));
+
+    pour.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST;
+    pour.goal.object_pose = left_pour_offset;
+    pp->sendGoal(pour);
+    pp->waitForResult(ros::Duration(max_planning_time_));
+
+    pour.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST;
+    left_pre_pour_offset.position.z = 1.0;
+    pour.goal.object_pose = left_pre_pour_offset;
+    pp->sendGoal(pour);
+    pp->waitForResult(ros::Duration(max_planning_time_));
+
+    ROS_INFO("PLACING WITH LEFT FAR HAND");
+    pour.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::PLACE_REQUEST;
+    pour.goal.object_pose = left_pick_offset;
+    pp->sendGoal(pour);
+    pp->waitForResult(ros::Duration(max_planning_time_));
+
+    manipulateObject("base_link",
+                     pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST, "left");
+}
+
+void Cooking::pick_cups(int salad_number){
+    ROS_INFO("PICKING FOR SALAD");
+    pr2_picknplace_msgs::PickPlaceGoal pick_right;
+    pick_right.goal.header.frame_id = "base_link";
+
+    pr2_picknplace_msgs::PickPlaceGoal pick_left;
+    pick_left.goal.header.frame_id = "base_link";
+
+    // Adjustments for picking the cups for the second salad
+    if (salad_number == 2){ 
+        left_pick_offset.position.x = 0.58;
+        left_past_pick_offset.position.x = 0.58;
+        left_pick_offset.position.y = 0.35;
+        left_past_pick_offset.position.y = 0.35;
+
+        right_pick_offset.position.x = 0.58;
+        right_past_pick_offset.position.x = 0.58;
+        right_pick_offset.position.y = -0.35;
+        right_past_pick_offset.position.y = -0.35;
+    }
+
+    // PICK CUPS
+    pick_right.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::PICK_REQUEST;
+    pick_right.goal.object_pose = right_pick_offset;
+    pick_left.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::PICK_REQUEST;
+    pick_left.goal.object_pose = left_pick_offset;
+    
+    pp_right->sendGoal(pick_right);
+    ros::Duration(0.3).sleep();
+    pp_left->sendGoal(pick_left);
+
+    pp_right->waitForResult(ros::Duration(max_planning_time_));
+    pp_left->waitForResult(ros::Duration(max_planning_time_));
+
+    if (pp_left->getState() != actionlib::SimpleClientGoalState::SUCCEEDED) {
+        ROS_INFO("Didn't finish LEFT pick request in time!");
+    }
+
+    ROS_DEBUG_STREAM("Stat: " << int(pp_left->getResult()->success));
+    if (!pp_left->getResult()->success) {
+        ROS_INFO("Couldn't execute LEFT pick request");
+    }
+
+    if (pp_right->getState() != actionlib::SimpleClientGoalState::SUCCEEDED) {
+        ROS_INFO("Didn't finish RIGHT pick request in time!");
+    }
+
+    ROS_DEBUG_STREAM("Stat: " << int(pp_right->getResult()->success));
+    if (!pp_right->getResult()->success) {
+        ROS_INFO("Couldn't execute RIGHT pick request");
+    } 
+
+    // LIFT PICKED CUPS
+    pick_right.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST;
+    pick_right.goal.object_pose = right_past_pick_offset;
+    pick_left.goal.request = pr2_picknplace_msgs::PicknPlaceGoal::MOVETO_REQUEST;
+    pick_left.goal.object_pose = left_past_pick_offset;
+
+    pp_right->sendGoal(pick_right);
+    ros::Duration(0.3).sleep();
+    pp_left->sendGoal(pick_left);
+
+    pp_right->waitForResult(ros::Duration(max_planning_time_));
+    pp_left->waitForResult(ros::Duration(max_planning_time_));
+
+    if (pp_left->getState() != actionlib::SimpleClientGoalState::SUCCEEDED) {
+        ROS_INFO("Didn't finish LEFT pick request in time!");
+    }
+
+    ROS_DEBUG_STREAM("Stat: " << int(pp_left->getResult()->success));
+    if (!pp_left->getResult()->success) {
+        ROS_INFO("Couldn't execute LEFT pick request");
+    }
+
+    if (pp_right->getState() != actionlib::SimpleClientGoalState::SUCCEEDED) {
+        ROS_INFO("Didn't finish RIGHT pick request in time!");
+    }
+
+    ROS_DEBUG_STREAM("Stat: " << int(pp_right->getResult()->success));
+    if (!pp_right->getResult()->success) {
+        ROS_INFO("Couldn't execute RIGHT pick request");
+    } 
+}
+
+
 void Cooking::combine_fruits(std::string fruit1, std::string fruit2, std::string bowl) {
 
     // Pick the fruits
@@ -262,6 +568,14 @@ void Cooking::look_at(std::string object){
         point.x = 0.5;
         point.y = 0.0;
         point.z = 0.6;
+    }
+    else if (object == "nothing") {
+        look_query.frame = "r_gripper_tool_frame";
+        look_query.follow = false;
+        
+        point.x = -0.2;
+        point.y = 0.0;
+        point.z = 0.0;
     }
     else {
         look_query.frame = object.c_str();

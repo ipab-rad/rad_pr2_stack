@@ -45,6 +45,13 @@ class Cooking {
     void look_at(std::string object);
     void say(std::string query);
 
+    void pour_close_right();
+    void pour_far_right();
+
+    void pour_close_left();
+    void pour_far_left();
+    void pick_cups(int salad_number);
+
     std::string banana_and_apple_phrase, use_bowl_phrase, 
                 ok_making_salad_phrase, no_banana_use_orange_phrase;
 
@@ -64,6 +71,8 @@ class Cooking {
 
     int state;
     geometry_msgs::Pose bowl_offset, left_arm_offset, right_arm_offset, fruit_offset;
+    geometry_msgs::Pose right_pick_offset, right_past_pick_offset, right_pre_pour_offset, right_pour_offset, right_pre_place_offset, right_place_offset;
+    geometry_msgs::Pose left_pick_offset, left_past_pick_offset, left_pre_pour_offset, left_pour_offset, left_pre_place_offset, left_place_offset;
 
     // Methods
     bool manipulateObject(
