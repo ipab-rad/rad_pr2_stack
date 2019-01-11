@@ -1,0 +1,3 @@
+[submodule "haf_grasping"]
+	path = haf_grasping
+	url = https://github.com/davidfischinger/haf_grasping.git
