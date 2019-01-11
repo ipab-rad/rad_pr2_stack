@@ -22,7 +22,7 @@ int main(int argc, char** argv) {
   if (argc != 2) {ROS_ERROR("Please input number of cubes (min. 1)"); return 1;}
 
   actionlib::SimpleActionClient<pr2_picknplace_msgs::PickPlaceAction>
-  ac("/pr2_picknplace/pick_place", true);
+  ac("/pr2_picknplace_right/pr2_picknplace", true);
 
   ac.waitForServer();
 
